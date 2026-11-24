@@ -1047,3 +1047,31 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     }
   });
 })();
+/* ===== PDF ऐप के अंदर ===== */
+$("pdfBtn").onclick = () => {
+  const q = $("q").value.trim().toLowerCase();
+  let a = ITEMS.filter(mine);
+  if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
+  a = window.catFilter(a);
+  if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "")).toLowerCase().includes(q));
+  a.sort((p, r) => nm(p).localeCompare(nm(r)));
+  if (!a.length) return alert("लिस्ट ख़ाली है");
+  let pr = $("printArea");
+  if (!pr) {
+    pr = E("div"); pr.id = "printArea"; document.body.append(pr);
+    const st = document.createElement("style");
+    st.textContent = "#printArea{display:none}@media print{body>*{display:none!important}#printArea{display:block!important;color:#000;background:#fff}#printArea table{width:100%;border-collapse:collapse}#printArea td,#printArea th{border:1px solid #999;padding:8px}#printArea th{background:#f57c00;color:#fff}}";
+    document.head.append(st);
+  }
+  pr.innerHTML = "";
+  const t = E("table"), h = E("tr");
+  ["#", "सामान", "भाव"].forEach((s) => h.append(E("th", "", s)));
+  t.append(h);
+  a.forEach((x, i) => {
+    const r = E("tr");
+    r.append(E("td", "", String(i + 1)), E("td", "", nm(x) + (x.size ? " (" + x.size + ")" : "")), E("td", "", money(Number(x.sellPrice) || 0) + "/" + unitOf(x)));
+    t.append(r);
+  });
+  pr.append(E("h2", "", S.shop + " – रेट लिस्ट"), E("p", "", new Date().toLocaleDateString("hi-IN")), t);
+  setTimeout(() => window.print(), 100);
+};
