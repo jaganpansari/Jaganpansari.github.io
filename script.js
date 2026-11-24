@@ -965,3 +965,85 @@ $("pSet").querySelectorAll("button").forEach((b) => {
   $("pdfBtn").textContent = "";
   $("pdfBtn").append(pdf);
 })();
+/* ===== सुधार: माइक, स्कैनर, WhatsApp, PDF, हिंदी नाम ===== */
+(function () {
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function listen(inp) {
+    if (!R) return alert("इस फ़ोन में आवाज़ से लिखना नहीं चलता");
+    const r = new R(); r.lang = "hi-IN";
+    r.onresult = (e) => {
+      let t = e.results[0][0].transcript.trim();
+      if (inp.type === "number") t = (t.match(/[\d.]+/) || [""])[0];
+      inp.value = t; inp.dispatchEvent(new Event("input"));
+    };
+    r.onerror = (e) => alert("माइक: " + e.error);
+    r.start();
+  }
+  $("qMic").onclick = () => listen($("q"));
+  document.querySelectorAll(".mic").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for)); }));
+
+  $("qScan").onclick = async () => {
+    if (!("BarcodeDetector" in window)) return alert("इस फ़ोन में स्कैनर नहीं चलता");
+    const box = $("modalBox"); box.innerHTML = "";
+    const v = E("video", "", null, "width:100%;border-radius:12px");
+    v.setAttribute("playsinline", ""); v.muted = true;
+    const c = E("button", "btn btn2", "✖ बंद करें");
+    box.append(E("h3", "", "📷 बारकोड स्कैन करें"), v, c);
+    $("modal").classList.add("on");
+    let st, on = true;
+    const stop = () => { on = false; st && st.getTracks().forEach((t) => t.stop()); $("modal").classList.remove("on"); };
+    c.onclick = stop;
+    try { st = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); v.srcObject = st; await v.play(); }
+    catch (e) { stop(); return alert("कैमरा नहीं खुला: " + e.message); }
+    const det = new BarcodeDetector();
+    const loop = async () => {
+      if (!on || !$("modal").classList.contains("on")) return stop();
+      try {
+        const r = await det.detect(v);
+        if (r.length) {
+          const code = r[0].rawValue; stop();
+          if (window.scanTarget) { const f = window.scanTarget; window.scanTarget = null; return f(code); }
+          const hit = ITEMS.find((x) => x.code === code);
+          return hit ? window.openSheet(hit) : alert("यह बारकोड किसी सामान से नहीं जुड़ा: " + code);
+        }
+      } catch (e) {}
+      setTimeout(loop, 300);
+    };
+    loop();
+  };
+
+  const visible = () => {
+    const q = $("q").value.trim().toLowerCase();
+    let a = ITEMS.filter(mine);
+    if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
+    a = window.catFilter(a);
+    if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "")).toLowerCase().includes(q));
+    return a.sort((p, r) => nm(p).localeCompare(nm(r)));
+  };
+  const line = (x) => nm(x) + (x.size ? " (" + x.size + ")" : "") + ": " + money(Number(x.sellPrice) || 0) + "/" + unitOf(x);
+
+  $("waBtn").onclick = () => {
+    const a = visible(); if (!a.length) return alert("लिस्ट ख़ाली है");
+    const m = "*" + S.shop + " – रेट लिस्ट*\n" + a.map((x) => "• " + line(x)).join("\n");
+    window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank");
+  };
+
+  $("pdfBtn").onclick = () => {
+    const a = visible(); if (!a.length) return alert("लिस्ट ख़ाली है");
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const rows = a.map((x, i) => " " + (i + 1) + " " + esc(nm(x)) + (x.size ? " (" + esc(x.size) + ")" : "") + " " + esc(money(Number(x.sellPrice) || 0)) + "/" + esc(unitOf(x)) + " ").join("");
+    const w = window.open("", "_blank");
+    if (!w) return alert("पॉप-अप की इजाज़त दें");
+    w.document.write('');
+    w.document.close();
+  };
+
+  let filled = false;
+  window.hooks.push(async () => {
+    if (filled) return; filled = true;
+    for (const x of ITEMS.filter((i) => !i.alt && nm(i))) {
+      const alt = /[\u0900-\u097F]/.test(nm(x)) ? toEng(nm(x)) : await toHindi(nm(x));
+      if (alt) updateDoc(doc(db, "items", x.id), { alt });
+    }
+  });
+})();
