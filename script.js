@@ -1047,3 +1047,33 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     }
   });
 })();
+/* ===== सुधार 2: भाषा, माइक, खोज ===== */
+(function () {
+  if (!S.lang) { S.lang = "en"; S.dual = true; saveS(); }
+  $("q").oninput = () => render();
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function listen(inp) {
+    if (!R) return alert("इस फ़ोन में आवाज़ से लिखना नहीं चलता");
+    const r = new R();
+    r.lang = inp.type === "number" ? "en-IN" : (S.lang === "hi" ? "hi-IN" : "en-IN");
+    r.onresult = (e) => {
+      let t = e.results[0][0].transcript.trim();
+      if (inp.type === "number") t = (t.match(/[\d.]+/) || [""])[0];
+      inp.value = t;
+      if (inp.id === "q") render();
+    };
+    r.onerror = (e) => alert("माइक: " + e.error);
+    r.start();
+  }
+  $("qMic").onclick = () => listen($("q"));
+  document.querySelectorAll(".mic").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for)); }));
+  const box = E("div", "box");
+  const sel = E("select");
+  [["en", "English (ब्रैकेट में हिंदी)"], ["hi", "हिंदी (ब्रैकेट में English)"]].forEach(([v, t]) => {
+    const o = E("option", "", t); o.value = v; if (S.lang === v) o.selected = true; sel.append(o);
+  });
+  sel.onchange = () => { S.lang = sel.value; S.dual = true; saveS(); render(); };
+  box.append(E("h3", "", "🌐 भाषा", "margin:0 0 8px"), sel);
+  $("pSet").prepend(box);
+  render();
+})();
