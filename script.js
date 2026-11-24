@@ -1077,3 +1077,64 @@ $("pSet").querySelectorAll("button").forEach((b) => {
   $("pSet").prepend(box);
   render();
 })();
+/* ===== सुधार 3: सब एक साथ ===== */
+(function () {
+  if (!S.lang) { S.lang = "en"; S.dual = true; saveS(); }
+  $("q").oninput = () => render();
+
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function listen(inp) {
+    if (!R) return alert("इस फ़ोन में आवाज़ से लिखना नहीं चलता");
+    const r = new R();
+    r.lang = inp.type === "number" ? "en-IN" : (S.lang === "hi" ? "hi-IN" : "en-IN");
+    r.onresult = (e) => {
+      let t = e.results[0][0].transcript.trim();
+      if (inp.type === "number") t = (t.match(/[\d.]+/) || [""])[0];
+      inp.value = t;
+      if (inp.id === "q") render();
+    };
+    r.onerror = (e) => alert("माइक: " + e.error);
+    r.start();
+  }
+  $("qMic").onclick = () => listen($("q"));
+  document.querySelectorAll(".mic").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for)); }));
+
+  if (!$("langBox")) {
+    const box = E("div", "box"); box.id = "langBox";
+    const sel = E("select");
+    [["en", "English (ब्रैकेट में हिंदी)"], ["hi", "हिंदी (ब्रैकेट में English)"]].forEach(([v, t]) => {
+      const o = E("option", "", t); o.value = v; if (S.lang === v) o.selected = true; sel.append(o);
+    });
+    sel.onchange = () => { S.lang = sel.value; S.dual = true; saveS(); render(); };
+    box.append(E("h3", "", "🌐 भाषा", "margin:0 0 8px"), sel);
+    $("pSet").prepend(box);
+  }
+
+  const st = document.createElement("style");
+  st.textContent = "#printArea{display:none}@media print{body>*{display:none!important}#printArea{display:block!important;padding:10px;color:#000;background:#fff}#printArea table{width:100%;border-collapse:collapse}#printArea td,#printArea th{border:1px solid #999;padding:6px}}";
+  document.head.append(st);
+  const pa = E("div"); pa.id = "printArea"; document.body.append(pa);
+  $("pdfBtn").onclick = () => {
+    const q = $("q").value.trim().toLowerCase();
+    let a = ITEMS.filter(mine);
+    if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
+    a = window.catFilter(a);
+    if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "")).toLowerCase().includes(q));
+    a.sort((p, r) => nm(p).localeCompare(nm(r)));
+    if (!a.length) return alert("लिस्ट ख़ाली है");
+    pa.innerHTML = "";
+    pa.append(E("h2", "", S.shop + " – रेट लिस्ट"), E("div", "", new Date().toLocaleDateString("hi-IN")));
+    const t = E("table"), h = E("tr");
+    ["#", "सामान", "भाव"].forEach((s) => h.append(E("th", "", s)));
+    t.append(h);
+    a.forEach((x, i) => {
+      const r = E("tr");
+      r.append(E("td", "", String(i + 1)), E("td", "", nm(x) + (x.alt ? " (" + x.alt + ")" : "") + (x.size ? " – " + x.size : "")), E("td", "", money(Number(x.sellPrice) || 0) + "/" + unitOf(x)));
+      t.append(r);
+    });
+    pa.append(t);
+    window.print();
+  };
+
+  render();
+})();
