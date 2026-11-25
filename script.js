@@ -965,3 +965,92 @@ $("pSet").querySelectorAll("button").forEach((b) => {
   $("pdfBtn").textContent = "";
   $("pdfBtn").append(pdf);
 })();
+/* ===== छोटा सुधार: WhatsApp, PDF, माइक, स्कैनर ===== */
+(function () {
+  const all = () => {
+    let a = ITEMS.filter(mine);
+    if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
+    if (window.catFilter) a = window.catFilter(a);
+    const q = $("q").value.trim().toLowerCase();
+    if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
+    return a.sort((p, r) => nm(p).localeCompare(nm(r)));
+  };
+  const line = (x) => nm(x) + (S.dual && x.alt ? " (" + x.alt + ")" : "") + (x.size ? " - " + x.size : "");
+  $("waBtn").onclick = () => {
+    const a = all();
+    if (!a.length) return alert("लिस्ट ख़ाली है");
+    const m = "*" + S.shop + " - रेट लिस्ट*\n" + a.map((x) => "• " + line(x) + ": " + money(Number(x.sellPrice) || 0) + "/" + unitOf(x)).join("\n");
+    window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank");
+  };
+  const pst = document.createElement("style");
+  pst.textContent = "#printArea{display:none}@media print{body>*{display:none!important}#printArea{display:block!important;color:#000;background:#fff;padding:10px}#printArea table{width:100%;border-collapse:collapse}#printArea td,#printArea th{border:1px solid #999;padding:6px;text-align:left}}";
+  document.head.append(pst);
+  const pa = E("div");
+  pa.id = "printArea";
+  document.body.append(pa);
+  $("pdfBtn").onclick = () => {
+    const a = all();
+    if (!a.length) return alert("लिस्ट ख़ाली है");
+    pa.innerHTML = "";
+    pa.append(E("h2", "", S.shop + " - रेट लिस्ट"), E("div", "", new Date().toLocaleDateString("hi-IN")));
+    const t = E("table"), h = E("tr");
+    ["#", "सामान", "भाव"].forEach((s) => h.append(E("th", "", s)));
+    t.append(h);
+    a.forEach((x, i) => {
+      const r = E("tr");
+      r.append(E("td", "", String(i + 1)), E("td", "", line(x)), E("td", "", money(Number(x.sellPrice) || 0) + "/" + unitOf(x)));
+      t.append(r);
+    });
+    pa.append(t);
+    setTimeout(() => window.print(), 200);
+  };
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const listen = (inp, btn) => {
+    if (!SR) return alert("इस फ़ोन में आवाज़ से लिखना नहीं चलता");
+    const r = new SR();
+    r.lang = inp.type === "number" ? "en-IN" : "hi-IN";
+    btn.classList.add("sun");
+    r.onend = () => btn.classList.remove("sun");
+    r.onresult = (e) => {
+      let t = e.results[0][0].transcript.trim();
+      if (inp.type === "number") t = (t.replace(/,/g, "").match(/[\d.]+/) || [""])[0];
+      inp.value = t;
+      if (inp.id === "q") render();
+    };
+    r.onerror = (e) => { btn.classList.remove("sun"); if (e.error !== "no-speech") alert("माइक: " + e.error); };
+    r.start();
+  };
+  $("qMic").onclick = () => listen($("q"), $("qMic"));
+  document.querySelectorAll(".mic[data-for]").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for), b); }));
+  $("qScan").onclick = async () => {
+    const done = window.scanTarget || ((code) => {
+      const hit = ITEMS.find((x) => x.code === code);
+      if (hit) window.openSheet(hit); else alert("यह बारकोड किसी सामान से नहीं जुड़ा: " + code);
+    });
+    window.scanTarget = null;
+    if (!("BarcodeDetector" in window)) return alert("इस फ़ोन में स्कैनर नहीं चलता");
+    const box = $("modalBox");
+    box.innerHTML = "";
+    const v = E("video", "", null, "width:100%;border-radius:12px");
+    v.setAttribute("playsinline", "");
+    v.muted = true;
+    const c = E("button", "btn btn2", "✖ बंद करें");
+    box.append(E("h3", "", "📷 बारकोड स्कैन करें"), v, c);
+    $("modal").classList.add("on");
+    let st, on = true;
+    const stop = () => { on = false; if (st) st.getTracks().forEach((t) => t.stop()); $("modal").classList.remove("on"); };
+    c.onclick = stop;
+    try {
+      st = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      v.srcObject = st;
+      await v.play();
+    } catch (e) { stop(); return alert("कैमरा नहीं खुला: " + e.message); }
+    const det = new BarcodeDetector();
+    const loop = async () => {
+      if (!on || !$("modal").classList.contains("on")) return stop();
+      try { const r = await det.detect(v); if (r.length) { stop(); return done(r[0].rawValue); } } catch (e) {}
+      setTimeout(loop, 300);
+    };
+    loop();
+  };
+})();
