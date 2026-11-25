@@ -1188,3 +1188,32 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     return o(u, ...r);
   };
 })();
+/* ===== तीन सुधार: खोज, माइक की भाषा, WhatsApp लिस्ट ===== */
+(function () {
+  $("q").oninput = () => render();
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SR) {
+    const st = SR.prototype.start;
+    SR.prototype.start = function () {
+      if (S.lang === "en" && this.lang === "hi-IN") this.lang = "en-IN";
+      return st.call(this);
+    };
+  }
+
+  $("waBtn").onclick = () => {
+    let a = ITEMS.filter(mine);
+    if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
+    if (window.catFilter) a = window.catFilter(a);
+    const q = $("q").value.trim().toLowerCase();
+    if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
+    const srt = { az: (p, r) => nm(p).localeCompare(nm(r)), new: (p, r) => (r.t || 0) - (p.t || 0), old: (p, r) => (p.t || 0) - (r.t || 0) };
+    a.sort(srt[S.sort] || srt.az);
+    if (!a.length) return alert("लिस्ट ख़ाली है");
+    const rows = a.map((x, i) =>
+      (i + 1) + ". " + nm(x) + (S.dual && x.alt ? " (" + x.alt + ")" : "") + (x.size ? " [" + x.size + "]" : "") +
+      " - *" + money(Number(x.sellPrice) || 0) + "*/" + unitOf(x));
+    const m = "*" + S.shop + " - रेट लिस्ट*\n📅 " + new Date().toLocaleDateString("en-IN") + "\n\n" + rows.join("\n");
+    window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank");
+  };
+})();
