@@ -1054,3 +1054,42 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     loop();
   };
 })();
+/* ===== दुकान का नाम बदलना (पेंसिल) ===== */
+(function () {
+  const DEF = "मेरी दुकान";
+  const sel = $("shopSel");
+  const pen = E("button", "ibtn", "✏️", "width:40px;height:40px;background:#fff3;color:#fff;margin-left:6px");
+  sel.after(pen);
+  const hideDef = () => {
+    if (!S.defGone) return;
+    [...sel.options].forEach((o) => { if (o.value === DEF) o.remove(); });
+  };
+  new MutationObserver(hideDef).observe(sel, { childList: true });
+  hideDef();
+  pen.onclick = async () => {
+    const old = S.shop;
+    const n = (prompt("दुकान का नया नाम लिखिए", old) || "").trim();
+    if (!n || n === old) return;
+    if ([...sel.options].some((o) => o.value === n)) return alert("इस नाम की दुकान पहले से है");
+    pen.disabled = true;
+    try {
+      const same = (x) => (x.shop || DEF) === old;
+      for (const c of ["items", "cats", "history"]) {
+        const s = await getDocs(collection(db, c));
+        for (const d of s.docs) if (same(d.data())) await updateDoc(d.ref, { shop: n });
+      }
+      const sh = await getDocs(collection(db, "shops"));
+      const f = sh.docs.find((d) => d.data().name === old);
+      if (f) await updateDoc(f.ref, { name: n });
+      else await addDoc(collection(db, "shops"), { name: n });
+      if (old === DEF) S.defGone = true;
+      S.shop = n;
+      saveS();
+      alert("✔️ दुकान का नाम बदल गया: " + n);
+      location.reload();
+    } catch (e) {
+      alert("नाम नहीं बदला: " + e.message);
+    }
+    pen.disabled = false;
+  };
+})();
