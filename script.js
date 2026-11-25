@@ -1,7 +1,6 @@
-/* ===== टुकड़ा 1 ===== */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const fbApp = initializeApp({
   apiKey: "AIzaSyCKehFeTicictV33BDMrdAy_f_o020ol38",
@@ -14,14 +13,17 @@ const fbApp = initializeApp({
 const auth = getAuth(fbApp);
 const db = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
 
+/* ===== सेटिंग और भाषा ===== */
 const $ = (id) => document.getElementById(id);
-const S = Object.assign({ theme: "orange", dark: false, cur: "₹", font: 16, bold: false, showPct: true, dual: false, sort: "az", shop: "मेरी दुकान", pin: "" }, JSON.parse(localStorage.getItem("rlS") || "{}"));
+const S = Object.assign({ theme: "orange", dark: false, cur: "₹", font: 16, bold: false, showPct: true, dual: false, sort: "az", shop: "मेरी दुकान", pin: "", lang: "hi" }, JSON.parse(localStorage.getItem("rlS") || "{}"));
 const saveS = () => localStorage.setItem("rlS", JSON.stringify(S));
+const L = (h, e) => (S.lang === "en" ? e : h);
 const THEMES = { orange: ["#f57c00", "#bf360c"], green: ["#2e7d32", "#1b5e20"], blue: ["#1565c0", "#0d47a1"], purple: ["#6a1b9a", "#4a148c"], red: ["#d32f2f", "#8e0000"] };
-const UNITS = ["किलो", "ग्राम", "लीटर", "पीस", "पैकेट", "दर्जन", "डिब्बा", "बोरी"];
+const UNITS = [["किलो", "Kg"], ["ग्राम", "Gram"], ["लीटर", "Litre"], ["पीस", "Piece"], ["पैकेट", "Packet"], ["दर्जन", "Dozen"], ["डिब्बा", "Box"], ["बोरी", "Bag"]];
+const unitShow = (u) => { const f = UNITS.find((x) => x[0] === u); return f ? L(f[0], f[1]) : u; };
+const shopShow = (n) => (n === "मेरी दुकान" ? L("मेरी दुकान", "My Shop") : n);
 
-
-/* ===== टुकड़ा 2 ===== */
+/* ===== डिज़ाइन ===== */
 const css = document.createElement("style");
 css.textContent = `
 :root{--acc:#f57c00;--acc2:#bf360c;--bg:#f3f4f8;--card:#fff;--tx:#1d1d1f;--mut:#777;--fs:16px}
@@ -34,10 +36,12 @@ header h1{margin:0 0 8px;font-size:1.4em}
 select,input,textarea{font-size:1em;padding:11px 12px;border-radius:12px;border:1px solid #9995;background:var(--card);color:var(--tx);width:100%}
 header select{width:auto;background:#fff3;color:#fff;border:0}
 header select option{color:#000}
-.page{display:none;padding:12px}
-.page.on{display:block}
+.page{display:none;padding:12px}.page.on{display:block}
 .row{display:flex;gap:8px;align-items:center}
-.ibtn{flex:none;width:46px;height:46px;border-radius:12px;border:0;background:var(--card);font-size:20px;box-shadow:0 1px 4px #0002}
+.ibtn{flex:none;width:46px;height:46px;border-radius:12px;border:0;background:var(--card);box-shadow:0 1px 4px #0002;display:flex;align-items:center;justify-content:center;color:var(--acc)}
+.micb{border-radius:50%}
+.micb.sun{background:var(--acc);color:#fff;animation:pl 1s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 var(--acc)}100%{box-shadow:0 0 0 12px transparent}}
 .pills{display:flex;gap:8px;overflow-x:auto;padding:10px 0}
 .pill{flex:none;padding:7px 14px;border-radius:20px;border:1.5px solid #9996;background:var(--card);color:var(--tx);font-weight:600}
 .pill.on{background:var(--acc);color:#fff;border-color:var(--acc);transform:scale(1.06);box-shadow:0 3px 10px #0003}
@@ -48,10 +52,8 @@ header select option{color:#000}
 .size{background:#8883;color:var(--tx)}
 .mut{color:var(--mut);font-size:.85em}
 .sell{color:var(--acc);font-size:1.35em;font-weight:800;text-align:right;white-space:nowrap}
-.pro{color:#2e7d32;font-weight:600}
-.loss{color:#d32f2f;font-weight:600}
-.cheap{background:linear-gradient(90deg,#ffb300,#ff6f00);color:#fff;border-radius:12px;padding:2px 8px;font-size:.75em;animation:glow 1.2s infinite alternate}
-@keyframes glow{to{box-shadow:0 0 12px #ffb300}}
+.pro{color:#2e7d32;font-weight:600}.loss{color:#d32f2f;font-weight:600}
+.cheap{background:linear-gradient(90deg,#ffb300,#ff6f00);color:#fff;border-radius:12px;padding:2px 8px;font-size:.75em}
 .btn{width:100%;padding:13px;border:0;border-radius:14px;background:var(--acc);color:#fff;font-size:1.05em;font-weight:700;margin-top:10px}
 .btn2{background:var(--card);color:var(--tx);border:1.5px solid #9996}
 label{display:block;margin:12px 0 5px;font-weight:600;color:var(--acc)}
@@ -62,58 +64,59 @@ nav button.on{color:var(--acc)}
 .ov{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:99}
 .ov.on{display:flex}
 .mbox{background:var(--card);color:var(--tx);border-radius:20px;padding:18px;width:90%;max-width:480px;max-height:85vh;overflow:auto}
-.sheet{align-items:flex-end}
-.sheet .mbox{border-radius:22px 22px 0 0;width:100%;max-width:none}
+.sheet{align-items:flex-end}.sheet .mbox{border-radius:22px 22px 0 0;width:100%;max-width:none}
 .tarazu{font-size:64px;display:inline-block;animation:sw 1s ease-in-out infinite alternate}
 @keyframes sw{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+#printArea{display:none}
+@media print{body>*{display:none!important}#printArea{display:block!important;color:#000;background:#fff;padding:10px}#printArea table{width:100%;border-collapse:collapse}#printArea td,#printArea th{border:1px solid #999;padding:6px;text-align:left}}
 `;
 document.head.appendChild(css);
-/* ===== टुकड़ा 3 ===== */
-function fld(id, t, type) {
-  return `<label>${t}</label><div class="row"><input id="${id}" type="${type}" ${type === "number" ? 'inputmode="decimal"' : ""}><button class="ibtn mic" data-for="${id}">🎤</button></div>`;
-}
+
+/* ===== निशान ===== */
+const IC = {
+  mic: '',
+  scan: '',
+  wa: '',
+  pdf: ''
+};
+
+/* ===== पन्ने ===== */
+const fld = (id, h, e, type) => ` `;
 document.body.innerHTML = `
-<div id="loader" class="ov on"><div style="text-align:center;color:#fff"><div class="tarazu">⚖️</div><div>लोड हो रहा है...</div></div></div>
-<div id="login" class="page" style="max-width:420px;margin:auto">
- <div class="box" style="text-align:center;margin-top:40px"><div class="tarazu">⚖️</div><h2>Rate List</h2>
- <div class="row"><select id="cc" style="width:125px">
-  <option value="+91" selected>🇮🇳 +91</option><option value="+977">🇳🇵 +977</option><option value="+880">🇧🇩 +880</option>
-  <option value="+971">🇦🇪 +971</option><option value="+966">🇸🇦 +966</option><option value="+1">🇺🇸 +1</option><option value="+44">🇬🇧 +44</option>
- </select><input id="phone" type="tel" placeholder="सिर्फ़ अपना मोबाइल नंबर"></div>
- <button class="btn" id="sendOtp">OTP भेजें</button>
- <input id="otp" type="number" placeholder="OTP डालें" style="margin-top:10px;display:none">
- <button class="btn" id="verOtp" style="display:none">लॉगिन करें</button>
- <div id="recap"></div></div></div>
-<div id="app" style="display:none">
- <header><h1>📋 Rate List</h1><div class="row"><select id="shopSel"></select><span id="net" style="margin-left:auto">🟢 ऑनलाइन</span></div></header>
- <div id="pList" class="page on">
-  <div class="pills" id="catBar"></div>
-  <div class="row"><input id="q" placeholder="🔍 सामान या होलसेलर खोजें"><button class="ibtn" id="qMic">🎤</button><button class="ibtn" id="qScan">📷</button></div>
-  <div class="pills" id="venBar"></div>
-  <div class="row"><select id="sortSel"><option value="az">🔤 A से Z</option><option value="new">🆕 नया पहले</option><option value="old">📜 पुराना पहले</option></select><button class="ibtn" id="waBtn">📲</button><button class="ibtn" id="pdfBtn">📄</button></div>
-  <div id="list"></div>
- </div>
- <div id="pAdd" class="page">
-  <button class="btn btn2" id="backAdd" style="width:auto;margin:0;padding:10px 18px">← वापस</button>
-  <div class="box"><h3 id="addTitle" style="margin:0">नया सामान जोड़ें</h3>
-  ${fld("fName", "सामान का नाम", "text")}
-  ${fld("fVen", "होलसेलर का नाम", "text")}
-  ${fld("fSize", "मात्रा / साइज़ (जैसे 1 किलो पैकेट, 6 पीस)", "text")}
-  <label>यूनिट</label><select id="fUnit">${UNITS.map((u) => `<option>${u}</option>`).join("")}</select>
-  ${fld("fBuy", "ख़रीद भाव", "number")}
-  ${fld("fSell", "बेच भाव", "number")}
-  <button class="btn" id="saveItem">✔️ सेव करें</button></div>
- </div>
- <div id="pSet" class="page"></div>
- <nav><button data-p="pList" class="on">📋 लिस्ट</button><button data-p="pAdd">➕ जोड़ें</button><button data-p="pSet">⚙️ सेटिंग</button></nav>
-</div>
-<div id="lock" class="ov"><div class="mbox" style="text-align:center"><h2>🔒 PIN डालें</h2><input id="pinIn" type="password" inputmode="numeric"><button class="btn" id="pinOk">खोलें</button></div></div>
-<div id="sheet" class="ov sheet"><div class="mbox" id="sheetBox"></div></div>
-<div id="modal" class="ov"><div class="mbox" id="modalBox"></div></div>`;
+⚖️ ${L("लोड हो रहा है...", "Loading...")}
+
+ ⚖️ Rate List
+ 
+ 
+ <input id="otp" type="number" placeholder="${L("OTP डालें", "Enter OTP")}" style="margin-top:10px;display:none">
+ 
+ 
+
+ 
+  
+  
+  
+  
+  
+ 
+ 
+ 
+ 
+ 
 
 
 
-/* ===== टुकड़ा 4 ===== */
+
+`;
+
+/* ===== छोटे काम ===== */
+function E(t, cls, txt, st) {
+  const e = document.createElement(t);
+  if (cls) e.className = cls;
+  if (txt != null) e.textContent = txt;
+  if (st) e.style.cssText = st;
+  return e;
+}
 function applyS() {
   const t = THEMES[S.theme] || THEMES.orange;
   document.documentElement.style.setProperty("--acc", t[0]);
@@ -123,13 +126,9 @@ function applyS() {
   document.body.classList.toggle("bold", S.bold);
 }
 applyS();
-
 function closeAll() {
   let any = false;
-  document.querySelectorAll("#sheet,#modal").forEach((o) => {
-    if (o.classList.contains("on")) any = true;
-    o.classList.remove("on");
-  });
+  document.querySelectorAll("#sheet,#modal").forEach((o) => { if (o.classList.contains("on")) any = true; o.classList.remove("on"); });
   return any;
 }
 function go(p) {
@@ -138,20 +137,11 @@ function go(p) {
   window.scrollTo(0, 0);
 }
 history.pushState({ rl: 1 }, "");
-window.addEventListener("popstate", () => {
-  if (!closeAll()) go("pList");
-  history.pushState({ rl: 1 }, "");
-});
-document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => go(b.dataset.p)));
-document.querySelectorAll(".ov").forEach((o) =>
-  o.addEventListener("click", (e) => {
-    if (e.target === o && o.id !== "lock" && o.id !== "loader") o.classList.remove("on");
-  })
-);
+window.addEventListener("popstate", () => { if (!closeAll()) go("pList"); history.pushState({ rl: 1 }, ""); });
+document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => { if (b.dataset.p === "pAdd") clearForm(); go(b.dataset.p); }));
+document.querySelectorAll(".ov").forEach((o) => o.addEventListener("click", (e) => { if (e.target === o && o.id !== "lock" && o.id !== "loader") o.classList.remove("on"); }));
 
-
-/* ===== टुकड़ा 5 ===== */
-let ITEMS = [], VEN = {}, curVen = "", started = false, confRes = null;
+let ITEMS = [], VEN = {}, CATS = [], curVen = "", curCat = "", started = false, confRes = null, filled = false;
 const PAL = ["#e53935", "#8e24aa", "#1e88e5", "#00897b", "#f4511e", "#6d4c41", "#3949ab", "#7cb342", "#d81b60", "#fb8c00"];
 function vColor(v) {
   if (VEN[v]) return VEN[v];
@@ -159,6 +149,14 @@ function vColor(v) {
   for (const c of v || "") h = (h * 31 + c.charCodeAt(0)) % 997;
   return PAL[h % PAL.length];
 }
+const nm = (x) => x.Item || "";
+const unitOf = (x) => unitShow(x.unit || "किलो");
+const mine = (x) => (x.shop || "मेरी दुकान") === S.shop;
+const money = (n) => S.cur + " " + Math.round((Number(n) || 0) * 100) / 100;
+const keyOf = (x) => (nm(x) + "|" + (x.size || "") + "|" + (x.unit || "किलो")).toLowerCase();
+const fullName = (x) => nm(x) + (S.dual && x.alt ? " (" + x.alt + ")" : "");
+
+/* ===== लॉगिन ===== */
 onAuthStateChanged(auth, (u) => {
   $("loader").classList.remove("on");
   if (!u) { $("app").style.display = "none"; $("login").classList.add("on"); return; }
@@ -169,35 +167,35 @@ onAuthStateChanged(auth, (u) => {
 });
 $("sendOtp").onclick = async () => {
   const n = $("phone").value.replace(/\D/g, "").replace(/^0+/, "");
-  if (n.length < 6) return alert("सही नंबर डालें");
+  if (n.length < 6) return alert(L("सही नंबर डालें", "Enter a valid number"));
   try {
     window.rv = window.rv || new RecaptchaVerifier(auth, "recap", { size: "invisible" });
     confRes = await signInWithPhoneNumber(auth, $("cc").value + n, window.rv);
     $("otp").style.display = "block";
     $("verOtp").style.display = "block";
-    alert("OTP भेज दिया");
+    alert(L("OTP भेज दिया", "OTP sent"));
   } catch (e) { alert("Error: " + e.message); }
 };
-$("verOtp").onclick = async () => {
-  try { await confRes.confirm($("otp").value.trim()); } catch (e) { alert("OTP गलत है"); }
-};
+$("verOtp").onclick = async () => { try { await confRes.confirm($("otp").value.trim()); } catch (e) { alert(L("OTP गलत है", "Wrong OTP")); } };
 $("pinOk").onclick = () => {
   if ($("pinIn").value === S.pin) { $("lock").classList.remove("on"); $("pinIn").value = ""; }
-  else alert("PIN गलत है");
+  else alert(L("PIN गलत है", "Wrong PIN"));
 };
-function net() { $("net").textContent = navigator.onLine ? "🟢 ऑनलाइन" : "🔴 ऑफ़लाइन"; }
+function net() { $("net").textContent = navigator.onLine ? "🟢 " + L("ऑनलाइन", "Online") : "🔴 " + L("ऑफ़लाइन", "Offline"); }
 window.addEventListener("online", net);
 window.addEventListener("offline", net);
 net();
 
-
-/* ===== टुकड़ा 6 ===== */
+/* ===== डेटा ===== */
 function startData() {
   if (started) return;
   started = true;
   onSnapshot(collection(db, "shops"), (s) => {
     const names = ["मेरी दुकान", ...s.docs.map((d) => d.data().name).filter((n) => n && n !== "मेरी दुकान")];
-    $("shopSel").innerHTML = names.map((n) => `<option ${n === S.shop ? "selected" : ""}>${n}</option>`).join("") + `<option value="__new">➕ नई दुकान</option>`;
+    const sel = $("shopSel");
+    sel.innerHTML = "";
+    names.forEach((n) => { const o = E("option", "", shopShow(n)); o.value = n; if (n === S.shop) o.selected = true; sel.append(o); });
+    const o = E("option", "", L("➕ नई दुकान", "➕ New shop")); o.value = "__new"; sel.append(o);
   });
   onSnapshot(collection(db, "vendors"), (s) => {
     VEN = {};
@@ -206,193 +204,88 @@ function startData() {
   });
   onSnapshot(collection(db, "items"), (s) => {
     ITEMS = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+    fillVenList();
     render();
-    if (window.onItems) window.onItems(s);
+    backfill();
+  });
+  onSnapshot(collection(db, "cats"), (s) => {
+    CATS = s.docs.map((d) => ({ id: d.id, ...d.data() }));
+    drawCats();
+    render();
   });
 }
 $("shopSel").onchange = async () => {
   if ($("shopSel").value === "__new") {
-    const n = prompt("नई दुकान का नाम");
+    const n = prompt(L("नई दुकान का नाम", "New shop name"));
     if (n && n.trim()) { S.shop = n.trim(); saveS(); await addDoc(collection(db, "shops"), { name: n.trim() }); }
     else $("shopSel").value = S.shop;
   } else { S.shop = $("shopSel").value; saveS(); }
-  curVen = "";
+  curVen = ""; curCat = "";
+  drawCats();
   render();
 };
-const nm = (x) => x.Item || "";
-const unitOf = (x) => x.unit || "किलो";
-const mine = (x) => (x.shop || "मेरी दुकान") === S.shop;
-const money = (n) => S.cur + " " + Math.round(n * 100) / 100;
-const keyOf = (x) => (nm(x) + "|" + (x.size || "") + "|" + unitOf(x)).toLowerCase();
-function showName(x) { return nm(x) + (S.dual && x.alt ? ` <span class="mut">(${x.alt})</span>` : ""); }
 
-
-/* ===== टुकड़ा 7 ===== */
+/* ===== लिस्ट ===== */
+function filtered() {
+  const q = $("q").value.trim().toLowerCase();
+  let a = ITEMS.filter(mine);
+  if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
+  const c = CATS.find((k) => k.id === curCat);
+  if (c) a = a.filter((x) => (c.items || []).includes(x.id));
+  if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
+  const srt = { az: (p, r) => nm(p).localeCompare(nm(r)), new: (p, r) => (r.t || 0) - (p.t || 0), old: (p, r) => (p.t || 0) - (r.t || 0) };
+  return a.sort(srt[S.sort] || srt.az);
+}
 function render() {
-  const q = $("q").value.trim().toLowerCase();
-  let arr = ITEMS.filter(mine);
+  const all = ITEMS.filter(mine);
   const vens = {}, best = {};
-  arr.forEach((x) => {
-    const v = x.vendor || "—";
-    vens[v] = (vens[v] || 0) + 1;
-    (best[keyOf(x)] = best[keyOf(x)] || []).push(Number(x.buyPrice) || 0);
-  });
-  $("venBar").innerHTML = `` +
-    Object.keys(vens).sort().map((v) => ``).join("");
-  $("venBar").querySelectorAll(".pill").forEach((b) => (b.onclick = () => { curVen = b.dataset.v; render(); }));
-  if (curVen) arr = arr.filter((x) => (x.vendor || "—") === curVen);
-  if (window.catFilter) arr = window.catFilter(arr);
-  if (q) arr = arr.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
-  const srt = { az: (a, b) => nm(a).localeCompare(nm(b)), new: (a, b) => (b.t || 0) - (a.t || 0), old: (a, b) => (a.t || 0) - (b.t || 0) };
-  arr.sort(srt[S.sort] || srt.az);
-  $("sortSel").value = S.sort;
-  $("list").innerHTML = arr.length ? "" : ` कोई सामान नहीं मिला `;
-  arr.forEach((x) => {
-    const g = best[keyOf(x)];
-    const b = Number(x.buyPrice) || 0, s = Number(x.sellPrice) || 0, p = s - b;
-    const cheap = g.length > 1 && b === Math.min(...g);
-    const pct = b ? ((p / b) * 100).toFixed(1) : 0;
-    const c = document.createElement("div");
-    c.className = "card";
-    c.innerHTML = ` ${showName(x)} ${cheap ? '✨ सबसे सस्ता' : ""}
-      ${x.vendor || "—"}${x.size ? `${x.size}` : ""}
-      ख़रीद ${money(b)} /${unitOf(x)}
-      ${S.showPct ? ` = 0 ? "pro" : "loss"}">${p >= 0 ? "मुनाफ़ा" : "घाटा"}: ${money(Math.abs(p))} (${pct}%) ` : ""}
-      बेच ${money(s)} /${unitOf(x)} `;
-    c.onclick = () => window.openSheet && window.openSheet(x);
-    $("list").appendChild(c);
-  });
-}
-$("q").oninput = render;
-$("sortSel").onchange = () => { S.sort = $("sortSel").value; saveS(); render(); };
-
-/* ===== टुकड़ा 7 सुधार ===== */
-render = function () {
-  const q = $("q").value.trim().toLowerCase();
-  let arr = ITEMS.filter(mine);
-  const vens = {}, best = {};
-  arr.forEach((x) => {
-    const v = x.vendor || "—";
-    vens[v] = (vens[v] || 0) + 1;
-    (best[keyOf(x)] = best[keyOf(x)] || []).push(Number(x.buyPrice) || 0);
-  });
-  const allOn = curVen ? "" : "on";
-  let vb = ``;
-  Object.keys(vens).sort().forEach((v) => {
-    const on = curVen === v ? "on" : "";
-    vb += ``;
-  });
-  $("venBar").innerHTML = vb;
-  $("venBar").querySelectorAll(".pill").forEach((b) => (b.onclick = () => { curVen = b.dataset.v; render(); }));
-  if (curVen) arr = arr.filter((x) => (x.vendor || "—") === curVen);
-  if (window.catFilter) arr = window.catFilter(arr);
-  if (q) arr = arr.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
-  const srt = { az: (a, b) => nm(a).localeCompare(nm(b)), new: (a, b) => (b.t || 0) - (a.t || 0), old: (a, b) => (a.t || 0) - (b.t || 0) };
-  arr.sort(srt[S.sort] || srt.az);
-  $("sortSel").value = S.sort;
-  $("list").innerHTML = arr.length ? "" : ` कोई सामान नहीं मिला `;
-  arr.forEach((x) => {
-    const g = best[keyOf(x)];
-    const b = Number(x.buyPrice) || 0, s = Number(x.sellPrice) || 0, p = s - b;
-    const cheap = g.length > 1 && b === Math.min(...g);
-    const pct = b ? ((p / b) * 100).toFixed(1) : 0;
-    const good = p >= 0;
-    const cls = good ? "pro" : "loss";
-    const word = good ? "मुनाफ़ा" : "घाटा";
-    const badge = cheap ? `✨ सबसे सस्ता` : "";
-    const sz = x.size ? `${x.size}` : "";
-    const pr = S.showPct ? ` ${word}: ${money(Math.abs(p))} (${pct}%) ` : "";
-    const c = document.createElement("div");
-    c.className = "card";
-    c.innerHTML = ` ${showName(x)} ${badge}
-      ${x.vendor || "—"}${sz}
-      ख़रीद ${money(b)} /${unitOf(x)} ${pr}
-      बेच ${money(s)} /${unitOf(x)} `;
-    c.onclick = () => window.openSheet && window.openSheet(x);
-    $("list").appendChild(c);
-  });
-};
-render();
-
-
-/* ===== टुकड़ा 7 सुधार 2 ===== */
-function E(t, cls, txt, st) {
-  const e = document.createElement(t);
-  if (cls) e.className = cls;
-  if (txt != null) e.textContent = txt;
-  if (st) e.style.cssText = st;
-  return e;
-}
-render = function () {
-  const q = $("q").value.trim().toLowerCase();
-  let arr = ITEMS.filter(mine);
-  const vens = {}, best = {};
-  arr.forEach((x) => {
+  all.forEach((x) => {
     const v = x.vendor || "—";
     vens[v] = (vens[v] || 0) + 1;
     (best[keyOf(x)] = best[keyOf(x)] || []).push(Number(x.buyPrice) || 0);
   });
   const vb = $("venBar");
   vb.innerHTML = "";
-  const all = E("button", "pill " + (curVen ? "" : "on"), "सब होलसेलर (" + arr.length + ")");
-  all.onclick = () => { curVen = ""; render(); };
-  vb.append(all);
+  const allB = E("button", "pill " + (curVen ? "" : "on"), L("सब होलसेलर", "All wholesalers") + " (" + all.length + ")");
+  allB.onclick = () => { curVen = ""; render(); };
+  vb.append(allB);
   Object.keys(vens).sort().forEach((v) => {
     const b = E("button", "pill " + (curVen === v ? "on" : ""));
     b.append(E("span", "", "●", "color:" + vColor(v)), " " + v + " (" + vens[v] + ")");
     b.onclick = () => { curVen = v; render(); };
     vb.append(b);
   });
-  if (curVen) arr = arr.filter((x) => (x.vendor || "—") === curVen);
-  if (window.catFilter) arr = window.catFilter(arr);
-  if (q) arr = arr.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
-  const srt = { az: (a, b) => nm(a).localeCompare(nm(b)), new: (a, b) => (b.t || 0) - (a.t || 0), old: (a, b) => (a.t || 0) - (b.t || 0) };
-  arr.sort(srt[S.sort] || srt.az);
   $("sortSel").value = S.sort;
-  const L = $("list");
-  L.innerHTML = "";
-  if (!arr.length) L.append(E("div", "box", "कोई सामान नहीं मिला", "text-align:center"));
+  const arr = filtered();
+  const Lst = $("list");
+  Lst.innerHTML = "";
+  if (!arr.length) Lst.append(E("div", "box", L("कोई सामान नहीं मिला", "No items found"), "text-align:center"));
   arr.forEach((x) => {
-    const g = best[keyOf(x)];
+    const g = best[keyOf(x)] || [];
     const b = Number(x.buyPrice) || 0, s = Number(x.sellPrice) || 0, p = s - b;
     const cheap = g.length > 1 && b === Math.min(...g);
     const pct = b ? ((p / b) * 100).toFixed(1) : 0;
+    const good = p >= 0;
     const left = E("div");
     const nmD = E("div", "nm", nm(x));
     if (S.dual && x.alt) nmD.append(" ", E("span", "mut", "(" + x.alt + ")"));
-    if (cheap) nmD.append(" ", E("span", "cheap", "✨ सबसे सस्ता"));
+    if (cheap) nmD.append(" ", E("span", "cheap", "✨ " + L("सबसे सस्ता", "Cheapest")));
     left.append(nmD, E("span", "tag", x.vendor || "—", "background:" + vColor(x.vendor)));
     if (x.size) left.append(E("span", "tag size", x.size));
-    left.append(E("div", "mut", "ख़रीद", "margin-top:6px"), E("div", "", money(b) + " /" + unitOf(x)));
-    if (S.showPct) left.append(E("div", p >= 0 ? "pro" : "loss", (p >= 0 ? "मुनाफ़ा" : "घाटा") + ": " + money(Math.abs(p)) + " (" + pct + "%)"));
+    left.append(E("div", "mut", L("ख़रीद", "Buy"), "margin-top:6px"), E("div", "", money(b) + " /" + unitOf(x)));
+    if (S.showPct) left.append(E("div", good ? "pro" : "loss", (good ? L("मुनाफ़ा", "Profit") : L("घाटा", "Loss")) + ": " + money(Math.abs(p)) + " (" + pct + "%)"));
     const right = E("div");
-    right.append(E("div", "mut", "बेच", "text-align:right"), E("div", "sell", money(s)), E("div", "mut", "/" + unitOf(x), "text-align:right"));
+    right.append(E("div", "mut", L("बेच", "Sell"), "text-align:right"), E("div", "sell", money(s)), E("div", "mut", "/" + unitOf(x), "text-align:right"));
     const c = E("div", "card");
     c.append(left, right);
-    c.onclick = () => window.openSheet && window.openSheet(x);
-    L.append(c);
+    c.onclick = () => openSheet(x);
+    Lst.append(c);
   });
-};
-render();
+}
+$("q").addEventListener("input", () => render());
+$("sortSel").onchange = () => { S.sort = $("sortSel").value; saveS(); render(); };
 
-
-/* ===== टुकड़ा 9 नया: जोड़ना, बदलना, हटाना ===== */
-let editId = null, editOld = null;
-window.hooks = window.hooks || [];
-window.onItems = (s) => window.hooks.forEach((h) => h(s));
-const dl = document.createElement("datalist");
-dl.id = "venList";
-document.body.append(dl);
-$("fVen").setAttribute("list", "venList");
-window.hooks.push(() => {
-  dl.innerHTML = "";
-  [...new Set(ITEMS.map((x) => x.vendor).filter(Boolean))].forEach((v) => {
-    const o = document.createElement("option");
-    o.value = v;
-    dl.append(o);
-  });
-});
-
+/* ===== हिंदी ↔ English नाम ===== */
 function toEng(t) {
   const V = { "अ": "a", "आ": "aa", "इ": "i", "ई": "ee", "उ": "u", "ऊ": "oo", "ए": "e", "ऐ": "ai", "ओ": "o", "औ": "au", "ऋ": "ri" };
   const M = { "ा": "a", "ि": "i", "ी": "ee", "ु": "u", "ू": "oo", "े": "e", "ै": "ai", "ो": "o", "ौ": "au", "ृ": "ri" };
@@ -402,7 +295,7 @@ function toEng(t) {
   const NUK = { "क": "q", "ख": "kh", "ग": "g", "ज": "z", "ड": "r", "ढ": "rh", "फ": "f" };
   const ch = [...t];
   let out = "", i = 0;
-  while (ch.length - i > 0) {
+  while (i < ch.length) {
     const c = ch[i];
     if (C[c]) {
       let base = C[c];
@@ -424,28 +317,46 @@ async function toHindi(t) {
   try {
     const r = await fetch("https://inputtools.google.com/request?itc=hi-t-i0-und&num=1&text=" + encodeURIComponent(t));
     const j = await r.json();
-    return j[1][0][1][0] || "";
+    return j[1].map((w) => w[1][0]).join(" ") || "";
   } catch (e) { return ""; }
 }
+const makeAlt = async (name) => (/[\u0900-\u097F]/.test(name) ? toEng(name) : await toHindi(name));
+async function backfill() {
+  if (filled) return;
+  filled = true;
+  for (const x of ITEMS.filter((i) => !i.alt && nm(i))) {
+    const alt = await makeAlt(nm(x));
+    if (alt) updateDoc(doc(db, "items", x.id), { alt }).catch(() => {});
+  }
+}
 
+/* ===== जोड़ना और बदलना ===== */
+let editId = null, editOld = null;
+const dl = E("datalist");
+dl.id = "venList";
+document.body.append(dl);
+$("fVen").setAttribute("list", "venList");
+function fillVenList() {
+  dl.innerHTML = "";
+  [...new Set(ITEMS.map((x) => x.vendor).filter(Boolean))].forEach((v) => { const o = E("option"); o.value = v; dl.append(o); });
+}
 function clearForm() {
   ["fName", "fVen", "fSize", "fBuy", "fSell"].forEach((i) => ($(i).value = ""));
-  $("fUnit").value = UNITS[0];
+  $("fUnit").value = UNITS[0][0];
   editId = null;
   editOld = null;
-  $("addTitle").textContent = "नया सामान जोड़ें";
+  $("addTitle").textContent = L("नया सामान जोड़ें", "Add new item");
 }
+clearForm();
 $("backAdd").onclick = () => { clearForm(); go("pList"); };
-document.querySelector('nav button[data-p="pAdd"]').addEventListener("click", clearForm);
-
 $("saveItem").onclick = async () => {
   const name = $("fName").value.trim();
-  if (!name) return alert("सामान का नाम डालें");
+  if (!name) return alert(L("सामान का नाम डालें", "Enter item name"));
   const data = {
     Item: name, vendor: $("fVen").value.trim(), size: $("fSize").value.trim(), unit: $("fUnit").value,
     buyPrice: Number($("fBuy").value) || 0, sellPrice: Number($("fSell").value) || 0, shop: S.shop
   };
-  data.alt = /[\u0900-\u097F]/.test(name) ? toEng(name) : await toHindi(name);
+  data.alt = await makeAlt(name);
   const err = (e) => alert("Error: " + e.message);
   if (editId) {
     updateDoc(doc(db, "items", editId), data).catch(err);
@@ -463,19 +374,29 @@ $("saveItem").onclick = async () => {
   go("pList");
 };
 
-window.openSheet = (x) => {
+/* ===== एक सामान पर दबाने से ===== */
+const hk = (x) => ((x.Item || "") + "|" + (x.vendor || "") + "|" + (x.shop || "मेरी दुकान")).toLowerCase();
+async function cleanHistory(only) {
+  const snap = await getDocs(collection(db, "history"));
+  const live = new Set(ITEMS.map(hk));
+  let n = 0;
+  for (const d of snap.docs) {
+    const r = d.data();
+    if (only ? hk(r) === only : !live.has(hk(r))) { await deleteDoc(d.ref); n++; }
+  }
+  return n;
+}
+function openSheet(x) {
   const box = $("sheetBox");
   box.innerHTML = "";
-  const t = E("div", "nm", nm(x) + (x.alt ? " (" + x.alt + ")" : ""));
-  const sub = E("div", "mut", (x.vendor || "") + " " + (x.size || ""));
-  const bShare = E("button", "btn", "📲 WhatsApp पर भेजें");
-  const bEdit = E("button", "btn btn2", "✏️ बदलें");
-  const bCode = E("button", "btn btn2", "▥ बारकोड जोड़ें");
-  const bDel = E("button", "btn btn2", "🗑️ हटाएँ", "color:#d32f2f");
-  box.append(t, sub, bShare, bEdit, bCode, bDel);
+  const bShare = E("button", "btn", "📲 " + L("WhatsApp पर भेजें", "Send on WhatsApp"));
+  const bEdit = E("button", "btn btn2", "✏️ " + L("बदलें", "Edit"));
+  const bCode = E("button", "btn btn2", "▥ " + L("बारकोड जोड़ें", "Add barcode"));
+  const bDel = E("button", "btn btn2", "🗑️ " + L("हटाएँ", "Delete"), "color:#d32f2f");
+  box.append(E("div", "nm", nm(x) + (x.alt ? " (" + x.alt + ")" : "")), E("div", "mut", (x.vendor || "") + " " + (x.size || "")), bShare, bEdit, bCode, bDel);
   $("sheet").classList.add("on");
   bShare.onclick = () => {
-    const m = "*" + nm(x) + "*" + (x.size ? " (" + x.size + ")" : "") + "\nभाव: " + money(Number(x.sellPrice) || 0) + "/" + unitOf(x) + "\n- " + S.shop;
+    const m = "*" + fullName(x) + "*" + (x.size ? " (" + x.size + ")" : "") + "\n" + L("भाव", "Rate") + ": " + money(x.sellPrice) + "/" + unitOf(x) + "\n- " + shopShow(S.shop);
     window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank");
   };
   bEdit.onclick = () => {
@@ -486,87 +407,140 @@ window.openSheet = (x) => {
     $("fName").value = nm(x);
     $("fVen").value = x.vendor || "";
     $("fSize").value = x.size || "";
-    $("fUnit").value = UNITS.includes(x.unit) ? x.unit : UNITS[0];
+    $("fUnit").value = UNITS.some((u) => u[0] === x.unit) ? x.unit : UNITS[0][0];
     $("fBuy").value = x.buyPrice || "";
     $("fSell").value = x.sellPrice || "";
-    $("addTitle").textContent = "✏️ सामान बदलें";
+    $("addTitle").textContent = "✏️ " + L("सामान बदलें", "Edit item");
     go("pAdd");
   };
   bCode.onclick = () => {
     $("sheet").classList.remove("on");
-    window.scanTarget = (code) => { updateDoc(doc(db, "items", x.id), { code }); alert("✔️ बारकोड जुड़ गया"); };
-    $("qScan").click();
+    scan((code) => { updateDoc(doc(db, "items", x.id), { code }); alert("✔️ " + L("बारकोड जुड़ गया", "Barcode added")); });
   };
   bDel.onclick = () => {
-    if (confirm(nm(x) + " हटाएँ?")) { deleteDoc(doc(db, "items", x.id)); $("sheet").classList.remove("on"); }
+    if (!confirm(nm(x) + " " + L("हटाएँ?", "delete?"))) return;
+    deleteDoc(doc(db, "items", x.id));
+    cleanHistory(hk(x));
+    $("sheet").classList.remove("on");
   };
+}
+
+/* ===== माइक ===== */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function listen(inp, btn) {
+  if (!SR) return alert(L("इस फ़ोन में आवाज़ से लिखना नहीं चलता", "Voice typing not supported"));
+  const r = new SR();
+  r.lang = inp.type === "number" ? "en-IN" : L("hi-IN", "en-IN");
+  btn.classList.add("sun");
+  r.onend = () => btn.classList.remove("sun");
+  r.onresult = (e) => {
+    let t = e.results[0][0].transcript.trim();
+    if (inp.type === "number") t = (t.replace(/,/g, "").match(/[\d.]+/) || [""])[0];
+    inp.value = t;
+    if (inp.id === "q") render();
+  };
+  r.onerror = (e) => { btn.classList.remove("sun"); if (e.error !== "no-speech") alert(L("माइक: ", "Mic: ") + e.error); };
+  r.start();
+}
+$("qMic").onclick = () => listen($("q"), $("qMic"));
+document.querySelectorAll(".micb[data-for]").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for), b); }));
+
+/* ===== स्कैनर ===== */
+async function scan(done) {
+  if (!("BarcodeDetector" in window)) return alert(L("इस फ़ोन में स्कैनर नहीं चलता", "Scanner not supported on this phone"));
+  const box = $("modalBox");
+  box.innerHTML = "";
+  const v = E("video", "", null, "width:100%;border-radius:12px");
+  v.setAttribute("playsinline", "");
+  v.muted = true;
+  const c = E("button", "btn btn2", "✖ " + L("बंद करें", "Close"));
+  box.append(E("h3", "", "📷 " + L("बारकोड स्कैन करें", "Scan barcode")), v, c);
+  $("modal").classList.add("on");
+  let st, on = true;
+  const stop = () => { on = false; if (st) st.getTracks().forEach((t) => t.stop()); $("modal").classList.remove("on"); };
+  c.onclick = stop;
+  try {
+    st = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    v.srcObject = st;
+    await v.play();
+  } catch (e) { stop(); return alert(L("कैमरा नहीं खुला: ", "Camera error: ") + e.message); }
+  const det = new BarcodeDetector();
+  const loop = async () => {
+    if (!on || !$("modal").classList.contains("on")) return stop();
+    try {
+      const r = await det.detect(v);
+      if (r.length) { stop(); return done(r[0].rawValue); }
+    } catch (e) {}
+    setTimeout(loop, 300);
+  };
+  loop();
+}
+$("qScan").onclick = () => scan((code) => {
+  const hit = ITEMS.find((x) => x.code === code);
+  if (hit) openSheet(hit);
+  else alert(L("यह बारकोड किसी सामान से नहीं जुड़ा: ", "No item has this barcode: ") + code);
+});
+
+/* ===== WhatsApp पर पूरी लिस्ट ===== */
+$("waBtn").onclick = () => {
+  const a = filtered();
+  if (!a.length) return alert(L("लिस्ट ख़ाली है", "List is empty"));
+  const m = "*" + shopShow(S.shop) + " – " + L("रेट लिस्ट", "Rate List") + "*\n" + a.map((x) => "• " + fullName(x) + (x.size ? " (" + x.size + ")" : "") + ": " + money(x.sellPrice) + "/" + unitOf(x)).join("\n");
+  window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank");
 };
 
-/* ===== नया माइक ===== */
-(function () {
-  const ns = "http://www.w3.org/2000/svg";
-  function micIcon() {
-    const s = document.createElementNS(ns, "svg");
-    s.setAttribute("width", "22");
-    s.setAttribute("height", "22");
-    s.setAttribute("viewBox", "0 0 24 24");
-    s.setAttribute("fill", "none");
-    s.setAttribute("stroke", "currentColor");
-    s.setAttribute("stroke-width", "2");
-    s.setAttribute("stroke-linecap", "round");
-    ["M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z", "M19 11a7 7 0 0 1-14 0", "M12 18v3"].forEach((d) => {
-      const p = document.createElementNS(ns, "path");
-      p.setAttribute("d", d);
-      s.append(p);
-    });
-    return s;
-  }
-  const st = document.createElement("style");
-  st.textContent = ".micb{border-radius:50%!important;color:var(--acc)!important;display:flex;align-items:center;justify-content:center}.micb.sun{background:var(--acc)!important;color:#fff!important;animation:pl 1s infinite}@keyframes pl{0%{box-shadow:0 0 0 0 var(--acc)}100%{box-shadow:0 0 0 12px transparent}}";
-  document.head.append(st);
-  document.querySelectorAll("#qMic,.mic").forEach((b) => {
-    b.textContent = "";
-    b.classList.add("micb");
-    b.append(micIcon());
+/* ===== PDF (ऐप के अंदर) ===== */
+$("pdfBtn").onclick = () => {
+  const a = filtered();
+  if (!a.length) return alert(L("लिस्ट ख़ाली है", "List is empty"));
+  const pa = $("printArea");
+  pa.innerHTML = "";
+  pa.append(E("h2", "", shopShow(S.shop) + " – " + L("रेट लिस्ट", "Rate List")), E("div", "", new Date().toLocaleDateString("hi-IN"), "margin-bottom:8px"));
+  const t = E("table"), h = E("tr");
+  ["#", L("सामान", "Item"), L("भाव", "Rate")].forEach((s) => h.append(E("th", "", s)));
+  t.append(h);
+  a.forEach((x, i) => {
+    const r = E("tr");
+    r.append(E("td", "", String(i + 1)), E("td", "", fullName(x) + (x.size ? " – " + x.size : "")), E("td", "", money(x.sellPrice) + "/" + unitOf(x)));
+    t.append(r);
   });
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (R) {
-    const old = R.prototype.start;
-    R.prototype.start = function () {
-      const btn = document.activeElement;
-      if (btn && btn.classList.contains("micb")) {
-        btn.classList.add("sun");
-        this.addEventListener("end", () => btn.classList.remove("sun"));
-      }
-      return old.call(this);
-    };
-  }
-})();
+  pa.append(t);
+  setTimeout(() => window.print(), 200);
+};
 
-/* ===== टुकड़ा 10: सेटिंग ===== */
+/* ===== सेटिंग ===== */
 (function () {
   const P = $("pSet");
   P.innerHTML = "";
-  function sec(t) { const b = E("div", "box"); b.append(E("h3", "", t, "margin:0 0 8px")); P.append(b); return b; }
-  function tog(box, label, key) {
+  const sec = (t) => { const b = E("div", "box"); b.append(E("h3", "", t, "margin:0 0 8px")); P.append(b); return b; };
+  const tog = (box, label, key) => {
     const r = E("div", "row", null, "justify-content:space-between;padding:8px 0");
-    const b = E("button", "pill " + (S[key] ? "on" : ""), S[key] ? "चालू ✔️" : "बंद");
-    b.onclick = () => { S[key] = !S[key]; saveS(); applyS(); render(); b.className = "pill " + (S[key] ? "on" : ""); b.textContent = S[key] ? "चालू ✔️" : "बंद"; };
+    const b = E("button", "");
+    const paint = () => { b.className = "pill " + (S[key] ? "on" : ""); b.textContent = S[key] ? L("चालू ✔️", "On ✔️") : L("बंद", "Off"); };
+    paint();
+    b.onclick = () => { S[key] = !S[key]; saveS(); applyS(); render(); paint(); };
     r.append(E("span", "", label), b);
     box.append(r);
-  }
+  };
 
-  const a = sec("👁️ दिखावट");
-  tog(a, "मुनाफ़ा / घाटा % दिखाएँ", "showPct");
-  tog(a, "नाम के साथ ब्रैकेट में दूसरी भाषा", "dual");
-  tog(a, "🌙 डार्क मोड", "dark");
-  tog(a, "मोटे अक्षर", "bold");
+  const lg = sec("🌐 " + L("भाषा", "Language"));
+  const ls = E("select");
+  [["hi", "हिंदी"], ["en", "English"]].forEach(([v, t]) => { const o = E("option", "", t); o.value = v; if (S.lang === v) o.selected = true; ls.append(o); });
+  ls.onchange = () => { S.lang = ls.value; saveS(); location.reload(); };
+  lg.append(ls);
+
+  const a = sec("👁️ " + L("दिखावट", "Display"));
+  tog(a, L("मुनाफ़ा / घाटा % दिखाएँ", "Show profit / loss %"), "showPct");
+  tog(a, L("नाम के साथ ब्रैकेट में दूसरी भाषा", "Other language name in brackets"), "dual");
+  tog(a, "🌙 " + L("डार्क मोड", "Dark mode"), "dark");
+  tog(a, L("मोटे अक्षर", "Bold text"), "bold");
   const fr = E("div", "row", null, "justify-content:space-between;padding:8px 0");
   const fm = E("button", "pill", "A−"), fp = E("button", "pill", "A+");
   fm.onclick = () => { S.font = Math.max(12, S.font - 1); saveS(); applyS(); };
   fp.onclick = () => { S.font = Math.min(24, S.font + 1); saveS(); applyS(); };
-  const fg = E("div", "row"); fg.append(fm, fp);
-  fr.append(E("span", "", "अक्षरों का आकार"), fg);
+  const fg = E("div", "row");
+  fg.append(fm, fp);
+  fr.append(E("span", "", L("अक्षरों का आकार", "Text size")), fg);
   a.append(fr);
   const th = E("div", "row", null, "gap:12px;padding:8px 0");
   Object.keys(THEMES).forEach((k) => {
@@ -574,33 +548,41 @@ window.openSheet = (x) => {
     b.onclick = () => { S.theme = k; saveS(); applyS(); };
     th.append(b);
   });
-  a.append(E("div", "mut", "रंग चुनें"), th);
+  a.append(E("div", "mut", L("रंग चुनें", "Choose colour")), th);
   const cu = E("select");
   ["₹", "Rs", "$", "AED", "रु"].forEach((c) => { const o = E("option", "", c); if (c === S.cur) o.selected = true; cu.append(o); });
   cu.onchange = () => { S.cur = cu.value; saveS(); render(); };
-  a.append(E("div", "mut", "मुद्रा", "margin-top:8px"), cu);
+  a.append(E("div", "mut", L("मुद्रा", "Currency"), "margin-top:8px"), cu);
 
-  const pb = sec("🔒 PIN लॉक");
-  const pinB = E("button", "btn btn2", S.pin ? "PIN बदलें / हटाएँ" : "PIN लगाएँ");
+  const pb = sec("🔒 " + L("PIN लॉक", "PIN lock"));
+  const pinB = E("button", "btn btn2");
+  const pinTxt = () => (pinB.textContent = S.pin ? L("PIN बदलें / हटाएँ", "Change / remove PIN") : L("PIN लगाएँ", "Set PIN"));
+  pinTxt();
   pinB.onclick = () => {
-    const n = prompt("नया 4 अंक का PIN डालें (हटाना हो तो ख़ाली छोड़ें)", "");
+    const n = prompt(L("नया 4 अंक का PIN डालें (हटाना हो तो ख़ाली छोड़ें)", "New 4-digit PIN (leave empty to remove)"), "");
     if (n === null) return;
-    S.pin = n.trim(); saveS();
-    pinB.textContent = S.pin ? "PIN बदलें / हटाएँ" : "PIN लगाएँ";
-    alert(S.pin ? "✔️ PIN लग गया" : "PIN हटा दिया");
+    S.pin = n.trim();
+    saveS();
+    pinTxt();
+    alert(S.pin ? L("✔️ PIN लग गया", "✔️ PIN set") : L("PIN हटा दिया", "PIN removed"));
   };
   pb.append(pinB);
 
-  const ex = sec("📥 Excel से सामान");
-  ex.append(E("div", "mut", "कॉलम क्रम: सामान, होलसेलर, साइज़, यूनिट, ख़रीद, बेच"));
-  const fi = E("input"); fi.type = "file";
-  const sam = E("button", "btn btn2", "⬇️ नमूना फ़ाइल");
+  const ex = sec("📥 " + L("Excel से सामान", "Import from Excel"));
+  ex.append(E("div", "mut", L("कॉलम क्रम: सामान, होलसेलर, साइज़, यूनिट, ख़रीद, बेच", "Columns: Item, Wholesaler, Size, Unit, Buy, Sell")));
+  const fi = E("input");
+  fi.type = "file";
+  const sam = E("button", "btn btn2", "⬇️ " + L("नमूना फ़ाइल", "Sample file"));
   sam.onclick = () => {
     const csv = "\uFEFFसामान,होलसेलर,साइज़,यूनिट,ख़रीद,बेच\nचावल,राहुल,1 किलो पैकेट,पैकेट,60,70\nब्रेड,साहिल,,पीस,15,20";
-    const l = E("a"); l.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); l.download = "namuna.csv"; l.click();
+    const l = E("a");
+    l.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    l.download = "namuna.csv";
+    l.click();
   };
   fi.onchange = async () => {
-    const f = fi.files[0]; if (!f) return;
+    const f = fi.files[0];
+    if (!f) return;
     try {
       const X = await import("https://cdn.sheetjs.com/xlsx-0.20.2/package/xlsx.mjs");
       const wb = X.read(await f.arrayBuffer());
@@ -616,69 +598,70 @@ window.openSheet = (x) => {
         addDoc(collection(db, "items"), d);
         n++;
       });
-      alert("✔️ " + n + " नए सामान जुड़े (डबल वाले छोड़ दिए)");
+      alert("✔️ " + n + " " + L("नए सामान जुड़े (डबल वाले छोड़ दिए)", "new items added (duplicates skipped)"));
       fi.value = "";
-    } catch (e) { alert("फ़ाइल नहीं पढ़ी गई: " + e.message); }
+    } catch (e) { alert(L("फ़ाइल नहीं पढ़ी गई: ", "Could not read file: ") + e.message); }
   };
   ex.append(fi, sam);
 
-  const hi = sec("📈 भाव का इतिहास");
-  const hb = E("button", "btn btn2", "इतिहास देखें");
+  const hi = sec("📈 " + L("भाव का इतिहास", "Price history"));
+  const hb = E("button", "btn", L("इतिहास देखें", "View history"));
+  const tir = (o, n) => ["🔻", "➖", "🔺"][Math.sign(n - o) + 1];
   hb.onclick = async () => {
-    const s = await getDocs(collection(db, "history"));
-    const rows = s.docs.map((d) => d.data()).filter((r) => (r.shop || "मेरी दुकान") === S.shop).sort((p, q) => q.t - p.t);
-    const box = $("modalBox"); box.innerHTML = "";
-    box.append(E("h3", "", "📈 भाव का इतिहास"));
-    const k = E("input"); k.placeholder = "🔍 सामान खोजें";
-    const L = E("div");
-    const fill = () => {
-      L.innerHTML = "";
-      const w = k.value.trim().toLowerCase();
-      const f = rows.filter((r) => !w || (r.Item + " " + r.vendor).toLowerCase().includes(w));
-      if (!f.length) L.append(E("div", "mut", "अभी कोई बदलाव नहीं"));
+    const snap = await getDocs(collection(db, "history"));
+    const rows = snap.docs.map((d) => d.data()).filter((r) => (r.shop || "मेरी दुकान") === S.shop).sort((p, q) => q.t - p.t);
+    const m = $("modalBox");
+    m.innerHTML = "";
+    const q = E("input");
+    q.placeholder = "🔍 " + L("सामान या होलसेलर खोजें", "Search item or wholesaler");
+    const list = E("div", "", null, "margin-top:8px");
+    const close = E("button", "btn btn2", "✖ " + L("बंद करें", "Close"));
+    m.append(E("h3", "", "📈 " + L("भाव का इतिहास", "Price history")), q, list, close);
+    const draw = () => {
+      list.innerHTML = "";
+      const t = q.value.trim().toLowerCase();
+      const f = rows.filter((r) => !t || ((r.Item || "") + " " + (r.vendor || "")).toLowerCase().includes(t));
+      if (!f.length) list.append(E("div", "mut", L("अभी कोई बदलाव नहीं मिला", "No changes yet")));
       f.forEach((r) => {
-        const ar = (o, n) => (n > o ? "🔺" : n === o ? "➖" : "🔻");
-        const d = E("div", "", null, "border-bottom:1px solid #8884;padding:8px 0");
-        d.append(E("b", "", r.Item + " (" + r.vendor + ")"), E("div", "", "ख़रीद: " + r.oldBuy + " → " + r.newBuy + " " + ar(r.oldBuy, r.newBuy) + " | बेच: " + r.oldSell + " → " + r.newSell + " " + ar(r.oldSell, r.newSell)), E("div", "mut", new Date(r.t).toLocaleString("hi-IN")));
-        L.append(d);
+        const d = new Date(r.t);
+        const c = E("div", "card", null, "display:block;padding:10px 12px;margin:6px 0");
+        c.append(
+          E("div", "nm", (r.Item || "") + (r.size ? " (" + r.size + ")" : "")),
+          E("span", "tag", r.vendor || "—", "background:" + vColor(r.vendor)),
+          E("div", "", L("ख़रीद", "Buy") + ": " + money(r.oldBuy) + " → " + money(r.newBuy) + " " + tir(r.oldBuy, r.newBuy)),
+          E("div", "", L("बेच", "Sell") + ": " + money(r.oldSell) + " → " + money(r.newSell) + " " + tir(r.oldSell, r.newSell)),
+          E("div", "mut", "📅 " + d.toLocaleDateString("hi-IN") + "  ⏰ " + d.toLocaleTimeString("hi-IN", { hour: "2-digit", minute: "2-digit" }))
+        );
+        list.append(c);
       });
     };
-    k.oninput = fill;
-    const c = E("button", "btn", "✖ बंद करें"); c.onclick = () => $("modal").classList.remove("on");
-    box.append(k, L, c);
+    q.oninput = draw;
+    close.onclick = () => $("modal").classList.remove("on");
+    draw();
     $("modal").classList.add("on");
-    fill();
   };
-  hi.append(hb);
+  const hc = E("button", "btn btn2", "🧹 " + L("हटाए गए सामान का इतिहास साफ़ करें", "Clear history of deleted items"));
+  hc.onclick = async () => alert("✔️ " + (await cleanHistory()) + " " + L("पुरानी एंट्री हटाईं", "old entries removed"));
+  hi.append(hb, hc);
 
-  const fb = sec("💬 सुझाव दें");
-  fb.append(E("div", "mut", "ऐप में कोई कमी लगे या नया फ़ीचर चाहिए, तो लिखिए"));
-  const ta = E("textarea"); ta.rows = 3;
-  const sb = E("button", "btn", "📧 भेजें");
+  const fb = sec("💬 " + L("सुझाव दें", "Feedback"));
+  fb.append(E("div", "mut", L("ऐप में कोई कमी लगे या नया फ़ीचर चाहिए, तो लिखिए", "Tell us what to improve")));
+  const ta = E("textarea");
+  ta.rows = 3;
+  const sb = E("button", "btn", "📧 " + L("भेजें", "Send"));
   sb.onclick = () => {
-    if (!ta.value.trim()) return alert("पहले कुछ लिखिए");
+    if (!ta.value.trim()) return alert(L("पहले कुछ लिखिए", "Write something first"));
     location.href = "mailto:rgoyal83556@gmail.com?subject=" + encodeURIComponent("Rate List सुझाव") + "&body=" + encodeURIComponent(ta.value);
   };
   fb.append(ta, sb);
 
-  const lo = E("button", "btn btn2", "🚪 लॉगआउट", "color:#d32f2f");
-  lo.onclick = () => { if (confirm("लॉगआउट करें?")) signOut(auth).then(() => location.reload()); };
+  const lo = E("button", "btn btn2", "🚪 " + L("लॉगआउट", "Logout"), "color:#d32f2f");
+  lo.onclick = () => { if (confirm(L("लॉगआउट करें?", "Logout?"))) signOut(auth).then(() => location.reload()); };
   P.append(lo);
 })();
 
-
-/* ===== टुकड़ा 11: कैटेगरी ===== */
-let ALLCATS = [], curCat = "";
-const myCats = () => ALLCATS.filter((c) => (c.shop || "मेरी दुकान") === S.shop);
-onSnapshot(collection(db, "cats"), (s) => {
-  ALLCATS = s.docs.map((d) => ({ id: d.id, ...d.data() }));
-  drawCats();
-  render();
-});
-window.catFilter = (arr) => {
-  const c = ALLCATS.find((k) => k.id === curCat);
-  return c ? arr.filter((x) => (c.items || []).includes(x.id)) : arr;
-};
+/* ===== कैटेगरी ===== */
+const myCats = () => CATS.filter((c) => (c.shop || "मेरी दुकान") === S.shop);
 function hold(el, fn) {
   let t;
   el.addEventListener("touchstart", () => { t = setTimeout(() => { el.dataset.held = "1"; fn(); }, 600); });
@@ -699,442 +682,52 @@ function drawCats() {
     hold(b, () => editCat(c));
     bar.append(b);
   });
-  const add = E("button", "pill", "➕ कैटेगरी");
+  const add = E("button", "pill", "➕ " + L("कैटेगरी", "Category"));
   add.onclick = async () => {
-    const n = prompt("नई कैटेगरी का नाम (जैसे तेल)");
+    const n = prompt(L("नई कैटेगरी का नाम (जैसे तेल)", "New category name (e.g. Oil)"));
     if (!n || !n.trim()) return;
     const r = await addDoc(collection(db, "cats"), { name: n.trim(), shop: S.shop, items: [] });
     editCat({ id: r.id, name: n.trim(), items: [] });
   };
   bar.append(add);
-  if (myCats().length) bar.append(E("span", "mut", "बदलने के लिए देर तक दबाएँ", "flex:none;align-self:center"));
+  if (myCats().length) bar.append(E("span", "mut", L("बदलने के लिए देर तक दबाएँ", "Long-press to edit"), "flex:none;align-self:center"));
 }
 function editCat(c) {
   const sel = new Set(c.items || []);
   const box = $("modalBox");
   box.innerHTML = "";
   const q = E("input");
-  q.placeholder = "🔍 सामान का नाम लिखिए";
+  q.placeholder = "🔍 " + L("सामान का नाम लिखिए", "Type item name");
   const list = E("div", "", null, "margin-top:8px");
-  const ok = E("button", "btn", "✔️ हो गया");
-  const del = E("button", "btn btn2", "🗑️ कैटेगरी हटाएँ", "color:#d32f2f");
+  const ok = E("button", "btn", "✔️ " + L("हो गया", "Done"));
+  const del = E("button", "btn btn2", "🗑️ " + L("कैटेगरी हटाएँ", "Delete category"), "color:#d32f2f");
   box.append(E("h3", "", "🏷️ " + c.name), q, list, ok, del);
-  function draw() {
+  const draw = () => {
     list.innerHTML = "";
     const t = q.value.trim().toLowerCase();
     let arr = ITEMS.filter(mine);
     arr = t ? arr.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "")).toLowerCase().includes(t)) : arr.filter((x) => sel.has(x.id));
-    if (!arr.length) list.append(E("div", "mut", t ? "कुछ नहीं मिला" : "ऊपर नाम लिखिए, सामान भाव के साथ दिखेगा, दबाकर जोड़िए"));
+    if (!arr.length) list.append(E("div", "mut", t ? L("कुछ नहीं मिला", "Nothing found") : L("ऊपर नाम लिखिए, सामान भाव के साथ दिखेगा, दबाकर जोड़िए", "Type a name above, tap an item to add it")));
     arr.forEach((x) => {
       const on = sel.has(x.id);
       const r = E("div", "card", null, "padding:10px 12px;margin:6px 0;align-items:center" + (on ? ";outline:2px solid var(--acc)" : ""));
       const l = E("div");
-      l.append(E("div", "nm", nm(x) + (x.size ? " (" + x.size + ")" : "")), E("div", "mut", (x.vendor || "—") + " • " + money(Number(x.sellPrice) || 0) + "/" + unitOf(x)));
+      l.append(E("div", "nm", fullName(x) + (x.size ? " (" + x.size + ")" : "")), E("div", "mut", (x.vendor || "—") + " • " + money(x.sellPrice) + "/" + unitOf(x)));
       r.append(l, E("div", "", on ? "✅" : "➕", "font-size:24px"));
       r.onclick = () => { on ? sel.delete(x.id) : sel.add(x.id); draw(); };
       list.append(r);
     });
-  }
+  };
   q.oninput = draw;
   draw();
   ok.onclick = () => { updateDoc(doc(db, "cats", c.id), { items: [...sel] }); $("modal").classList.remove("on"); };
   del.onclick = () => {
-    if (!confirm(c.name + " हटाएँ?")) return;
+    if (!confirm(c.name + " " + L("हटाएँ?", "delete?"))) return;
     deleteDoc(doc(db, "cats", c.id));
     if (curCat === c.id) curCat = "";
     $("modal").classList.remove("on");
   };
   $("modal").classList.add("on");
 }
-$("shopSel").addEventListener("change", () => { curCat = ""; drawCats(); });
 drawCats();
-
-/* ===== लिस्ट का डिज़ाइन (हमेशा सबसे आख़िर में) ===== */
-render = function () {
-  const q = $("q").value.trim().toLowerCase();
-  let arr = ITEMS.filter(mine);
-  const vens = {}, best = {};
-  arr.forEach((x) => {
-    const v = x.vendor || "—";
-    vens[v] = (vens[v] || 0) + 1;
-    (best[keyOf(x)] = best[keyOf(x)] || []).push(Number(x.buyPrice) || 0);
-  });
-  const vb = $("venBar");
-  vb.innerHTML = "";
-  const all = E("button", "pill " + (curVen ? "" : "on"), "सब होलसेलर (" + arr.length + ")");
-  all.onclick = () => { curVen = ""; render(); };
-  vb.append(all);
-  Object.keys(vens).sort().forEach((v) => {
-    const b = E("button", "pill " + (curVen === v ? "on" : ""));
-    b.append(E("span", "", "●", "color:" + vColor(v)), " " + v + " (" + vens[v] + ")");
-    b.onclick = () => { curVen = v; render(); };
-    vb.append(b);
-  });
-  if (curVen) arr = arr.filter((x) => (x.vendor || "—") === curVen);
-  if (window.catFilter) arr = window.catFilter(arr);
-  if (q) arr = arr.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
-  const srt = { az: (a, b) => nm(a).localeCompare(nm(b)), new: (a, b) => (b.t || 0) - (a.t || 0), old: (a, b) => (a.t || 0) - (b.t || 0) };
-  arr.sort(srt[S.sort] || srt.az);
-  $("sortSel").value = S.sort;
-  const L = $("list");
-  L.innerHTML = "";
-  if (!arr.length) L.append(E("div", "box", "कोई सामान नहीं मिला", "text-align:center"));
-  arr.forEach((x) => {
-    const g = best[keyOf(x)];
-    const b = Number(x.buyPrice) || 0, s = Number(x.sellPrice) || 0, p = s - b;
-    const cheap = g.length - 1 && b === Math.min(...g);
-    const pct = b ? ((p / b) * 100).toFixed(1) : 0;
-    const good = !(p < 0);
-    const left = E("div");
-    const nmD = E("div", "nm", nm(x));
-    if (S.dual && x.alt) nmD.append(" ", E("span", "mut", "(" + x.alt + ")"));
-    if (cheap) nmD.append(" ", E("span", "cheap", "✨ सबसे सस्ता"));
-    left.append(nmD, E("span", "tag", x.vendor || "—", "background:" + vColor(x.vendor)));
-    if (x.size) left.append(E("span", "tag size", x.size));
-    left.append(E("div", "mut", "ख़रीद", "margin-top:6px"), E("div", "", money(b) + " /" + unitOf(x)));
-    if (S.showPct) left.append(E("div", good ? "pro" : "loss", (good ? "मुनाफ़ा" : "घाटा") + ": " + money(Math.abs(p)) + " (" + pct + "%)"));
-    const right = E("div");
-    right.append(E("div", "mut", "बेच", "text-align:right"), E("div", "sell", money(s)), E("div", "mut", "/" + unitOf(x), "text-align:right"));
-    const c = E("div", "card");
-    c.append(left, right);
-    c.onclick = () => window.openSheet && window.openSheet(x);
-    L.append(c);
-  });
-};
 render();
-
-
-/* ===== टुकड़ा 12: भाव का इतिहास ===== */
-(function () {
-  const box = E("div", "box");
-  const btn = E("button", "btn", "📈 भाव का इतिहास");
-  box.append(E("h3", "", "📈 भाव का इतिहास", "margin:0"), E("div", "mut", "किस सामान का भाव कब बदला"), btn);
-  $("pSet").append(box);
-  const tir = (a, b) => ["🔻", "➖", "🔺"][Math.sign(b - a) + 1];
-  btn.onclick = async () => {
-    const snap = await getDocs(collection(db, "history"));
-    const rows = snap.docs.map((d) => d.data()).filter((r) => (r.shop || "मेरी दुकान") === S.shop).sort((a, b) => b.t - a.t);
-    const m = $("modalBox");
-    m.innerHTML = "";
-    const q = E("input");
-    q.placeholder = "🔍 सामान या होलसेलर खोजें";
-    const list = E("div", "", null, "margin-top:8px");
-    const close = E("button", "btn btn2", "✖ बंद करें");
-    m.append(E("h3", "", "📈 भाव का इतिहास"), q, list, close);
-    function draw() {
-      list.innerHTML = "";
-      const t = q.value.trim().toLowerCase();
-      const f = rows.filter((r) => !t || ((r.Item || "") + " " + (r.vendor || "")).toLowerCase().includes(t));
-      if (!f.length) list.append(E("div", "mut", "अभी कोई बदलाव नहीं मिला। किसी सामान का भाव बदलेंगे, तो यहाँ दिखेगा।"));
-      f.forEach((r) => {
-        const d = new Date(r.t);
-        const c = E("div", "card", null, "display:block;padding:10px 12px;margin:6px 0");
-        c.append(
-          E("div", "nm", (r.Item || "") + (r.size ? " (" + r.size + ")" : "")),
-          E("span", "tag", r.vendor || "—", "background:" + vColor(r.vendor)),
-          E("div", "", "ख़रीद: " + money(r.oldBuy) + " → " + money(r.newBuy) + " " + tir(r.oldBuy, r.newBuy)),
-          E("div", "", "बेच: " + money(r.oldSell) + " → " + money(r.newSell) + " " + tir(r.oldSell, r.newSell)),
-          E("div", "mut", "📅 " + d.toLocaleDateString("hi-IN") + "  ⏰ " + d.toLocaleTimeString("hi-IN", { hour: "2-digit", minute: "2-digit" }))
-        );
-        list.append(c);
-      });
-    }
-    q.oninput = draw;
-    close.onclick = () => $("modal").classList.remove("on");
-    draw();
-    $("modal").classList.add("on");
-  };
-})();
-
-/* ===== इतिहास साफ़ करना ===== */
-(function () {
-  const hk = (x) => ((x.Item || "") + "|" + (x.vendor || "") + "|" + (x.shop || "मेरी दुकान")).toLowerCase();
-  async function saaf(only) {
-    const snap = await getDocs(collection(db, "history"));
-    const live = new Set(ITEMS.map(hk));
-    let n = 0;
-    for (const d of snap.docs) {
-      const r = d.data();
-      if (only ? hk(r) === only : !live.has(hk(r))) { await deleteDoc(d.ref); n++; }
-    }
-    return n;
-  }
-  const b = E("button", "btn btn2", "🧹 हटाए गए सामान का इतिहास साफ़ करें");
-  b.onclick = async () => alert("✔️ " + (await saaf()) + " पुरानी एंट्री हटाईं");
-  $("pSet").append(b);
-  const old = window.openSheet;
-  window.openSheet = (x) => {
-    old(x);
-    const del = [...$("sheetBox").querySelectorAll("button")].find((k) => k.textContent.includes("हटाएँ"));
-    if (!del) return;
-    del.onclick = () => {
-      if (!confirm(nm(x) + " हटाएँ?")) return;
-      deleteDoc(doc(db, "items", x.id));
-      saaf(hk(x));
-      $("sheet").classList.remove("on");
-    };
-  };
-})();
-
-
-/* ===== डबल बटन हटाओ (सबसे नीचे) ===== */
-(function () {
-  const seen = {};
-  $("pSet").querySelectorAll("button").forEach((b) => {
-    const t = b.textContent;
-    let k = "";
-    if (t.includes("भाव का इतिहास") && !t.includes("साफ़")) k = "his";
-    if (t.includes("Excel")) k = "xls";
-    if (!k) return;
-    if (!seen[k]) { seen[k] = 1; return; }
-    const bx = b.closest(".box");
-    (bx && bx.parentElement === $("pSet") ? bx : b).style.display = "none";
-  });
-})();
-
-
-/* ===== नीचे वाला डबल इतिहास हटाओ ===== */
-$("pSet").querySelectorAll("button").forEach((b) => {
-  if (b.textContent.trim() !== "📈 भाव का इतिहास") return;
-  const bx = b.closest(".box");
-  (bx && bx.parentElement === $("pSet") ? bx : b).style.display = "none";
-});
-
-/* ===== स्कैनर का निशान ===== */
-(function () {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("width", "26");
-  svg.setAttribute("height", "26");
-  const add = (tag, at) => {
-    const e = document.createElementNS(ns, tag);
-    Object.entries(at).forEach(([k, v]) => e.setAttribute(k, v));
-    svg.append(e);
-  };
-  const st = { fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round" };
-  add("path", { d: "M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3", ...st });
-  [[6, 2], [9, 1], [11, 2], [14, 1], [16, 2]].forEach(([x, w]) =>
-    add("rect", { x: x, y: 8, width: w, height: 8, fill: "currentColor" })
-  );
-  add("line", { x1: 4, y1: 12, x2: 20, y2: 12, stroke: "#e53935", "stroke-width": "1.5" });
-  const b = $("qScan");
-  b.textContent = "";
-  b.append(svg);
-  b.style.color = "var(--acc)";
-})();
-
-
-/* ===== छोटा A से Z डिब्बा ===== */
-(function () {
-  const s = $("sortSel");
-  s.style.flex = "0 0 auto";
-  s.style.width = "auto";
-  s.style.maxWidth = "140px";
-  s.style.padding = "8px 10px";
-  s.style.fontSize = "14px";
-})();
-
-/* ===== WhatsApp और PDF के निशान ===== */
-(function () {
-  const ns = "http://www.w3.org/2000/svg";
-  const mk = (kids) => {
-    const s = document.createElementNS(ns, "svg");
-    s.setAttribute("viewBox", "0 0 24 24");
-    s.setAttribute("width", "28");
-    s.setAttribute("height", "28");
-    kids.forEach(([tag, at, txt]) => {
-      const e = document.createElementNS(ns, tag);
-      Object.entries(at).forEach(([k, v]) => e.setAttribute(k, v));
-      if (txt) e.textContent = txt;
-      s.append(e);
-    });
-    return s;
-  };
-  const wa = mk([
-    ["path", { d: "M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z", fill: "#25D366" }],
-    ["path", { d: "M8.5 7.5c.3-.6.6-.6 1-.6h.6c.2 0 .4.1.5.4l.8 1.9c.1.3 0 .5-.1.7l-.6.7c-.1.2-.1.3 0 .5a7 7 0 0 0 3.3 2.9c.2.1.4.1.5-.1l.8-.9c.2-.2.4-.2.6-.1l1.8.9c.3.1.4.3.3.6-.2 1.1-1.2 1.9-2.3 1.9A8 8 0 0 1 8 10c-.1-.9.1-1.8.5-2.5z", fill: "#fff" }]
-  ]);
-  const pdf = mk([
-    ["path", { d: "M6 2h9l5 5v15H6z", fill: "#e53935" }],
-    ["path", { d: "M15 2v5h5", fill: "#ffcdd2" }],
-    ["text", { x: "13", y: "18", "font-size": "6.5", "font-weight": "bold", fill: "#fff", "text-anchor": "middle", "font-family": "Arial" }, "PDF"]
-  ]);
-  $("waBtn").textContent = "";
-  $("waBtn").append(wa);
-  $("pdfBtn").textContent = "";
-  $("pdfBtn").append(pdf);
-})();
-/* ===== सुधार: माइक, स्कैनर, WhatsApp, PDF, हिंदी नाम ===== */
-(function () {
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  function listen(inp) {
-    if (!R) return alert("इस फ़ोन में आवाज़ से लिखना नहीं चलता");
-    const r = new R(); r.lang = "hi-IN";
-    r.onresult = (e) => {
-      let t = e.results[0][0].transcript.trim();
-      if (inp.type === "number") t = (t.match(/[\d.]+/) || [""])[0];
-      inp.value = t; inp.dispatchEvent(new Event("input"));
-    };
-    r.onerror = (e) => alert("माइक: " + e.error);
-    r.start();
-  }
-  $("qMic").onclick = () => listen($("q"));
-  document.querySelectorAll(".mic").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for)); }));
-
-  $("qScan").onclick = async () => {
-    if (!("BarcodeDetector" in window)) return alert("इस फ़ोन में स्कैनर नहीं चलता");
-    const box = $("modalBox"); box.innerHTML = "";
-    const v = E("video", "", null, "width:100%;border-radius:12px");
-    v.setAttribute("playsinline", ""); v.muted = true;
-    const c = E("button", "btn btn2", "✖ बंद करें");
-    box.append(E("h3", "", "📷 बारकोड स्कैन करें"), v, c);
-    $("modal").classList.add("on");
-    let st, on = true;
-    const stop = () => { on = false; st && st.getTracks().forEach((t) => t.stop()); $("modal").classList.remove("on"); };
-    c.onclick = stop;
-    try { st = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); v.srcObject = st; await v.play(); }
-    catch (e) { stop(); return alert("कैमरा नहीं खुला: " + e.message); }
-    const det = new BarcodeDetector();
-    const loop = async () => {
-      if (!on || !$("modal").classList.contains("on")) return stop();
-      try {
-        const r = await det.detect(v);
-        if (r.length) {
-          const code = r[0].rawValue; stop();
-          if (window.scanTarget) { const f = window.scanTarget; window.scanTarget = null; return f(code); }
-          const hit = ITEMS.find((x) => x.code === code);
-          return hit ? window.openSheet(hit) : alert("यह बारकोड किसी सामान से नहीं जुड़ा: " + code);
-        }
-      } catch (e) {}
-      setTimeout(loop, 300);
-    };
-    loop();
-  };
-
-  const visible = () => {
-    const q = $("q").value.trim().toLowerCase();
-    let a = ITEMS.filter(mine);
-    if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
-    a = window.catFilter(a);
-    if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "")).toLowerCase().includes(q));
-    return a.sort((p, r) => nm(p).localeCompare(nm(r)));
-  };
-  const line = (x) => nm(x) + (x.size ? " (" + x.size + ")" : "") + ": " + money(Number(x.sellPrice) || 0) + "/" + unitOf(x);
-
-  $("waBtn").onclick = () => {
-    const a = visible(); if (!a.length) return alert("लिस्ट ख़ाली है");
-    const m = "*" + S.shop + " – रेट लिस्ट*\n" + a.map((x) => "• " + line(x)).join("\n");
-    window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank");
-  };
-
-  $("pdfBtn").onclick = () => {
-    const a = visible(); if (!a.length) return alert("लिस्ट ख़ाली है");
-    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    const rows = a.map((x, i) => " " + (i + 1) + " " + esc(nm(x)) + (x.size ? " (" + esc(x.size) + ")" : "") + " " + esc(money(Number(x.sellPrice) || 0)) + "/" + esc(unitOf(x)) + " ").join("");
-    const w = window.open("", "_blank");
-    if (!w) return alert("पॉप-अप की इजाज़त दें");
-    w.document.write('');
-    w.document.close();
-  };
-
-  let filled = false;
-  window.hooks.push(async () => {
-    if (filled) return; filled = true;
-    for (const x of ITEMS.filter((i) => !i.alt && nm(i))) {
-      const alt = /[\u0900-\u097F]/.test(nm(x)) ? toEng(nm(x)) : await toHindi(nm(x));
-      if (alt) updateDoc(doc(db, "items", x.id), { alt });
-    }
-  });
-})();
-/* ===== सुधार 2: भाषा, माइक, खोज ===== */
-(function () {
-  if (!S.lang) { S.lang = "en"; S.dual = true; saveS(); }
-  $("q").oninput = () => render();
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  function listen(inp) {
-    if (!R) return alert("इस फ़ोन में आवाज़ से लिखना नहीं चलता");
-    const r = new R();
-    r.lang = inp.type === "number" ? "en-IN" : (S.lang === "hi" ? "hi-IN" : "en-IN");
-    r.onresult = (e) => {
-      let t = e.results[0][0].transcript.trim();
-      if (inp.type === "number") t = (t.match(/[\d.]+/) || [""])[0];
-      inp.value = t;
-      if (inp.id === "q") render();
-    };
-    r.onerror = (e) => alert("माइक: " + e.error);
-    r.start();
-  }
-  $("qMic").onclick = () => listen($("q"));
-  document.querySelectorAll(".mic").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for)); }));
-  const box = E("div", "box");
-  const sel = E("select");
-  [["en", "English (ब्रैकेट में हिंदी)"], ["hi", "हिंदी (ब्रैकेट में English)"]].forEach(([v, t]) => {
-    const o = E("option", "", t); o.value = v; if (S.lang === v) o.selected = true; sel.append(o);
-  });
-  sel.onchange = () => { S.lang = sel.value; S.dual = true; saveS(); render(); };
-  box.append(E("h3", "", "🌐 भाषा", "margin:0 0 8px"), sel);
-  $("pSet").prepend(box);
-  render();
-})();
-/* ===== सुधार 3: सब एक साथ ===== */
-(function () {
-  if (!S.lang) { S.lang = "en"; S.dual = true; saveS(); }
-  $("q").oninput = () => render();
-
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  function listen(inp) {
-    if (!R) return alert("इस फ़ोन में आवाज़ से लिखना नहीं चलता");
-    const r = new R();
-    r.lang = inp.type === "number" ? "en-IN" : (S.lang === "hi" ? "hi-IN" : "en-IN");
-    r.onresult = (e) => {
-      let t = e.results[0][0].transcript.trim();
-      if (inp.type === "number") t = (t.match(/[\d.]+/) || [""])[0];
-      inp.value = t;
-      if (inp.id === "q") render();
-    };
-    r.onerror = (e) => alert("माइक: " + e.error);
-    r.start();
-  }
-  $("qMic").onclick = () => listen($("q"));
-  document.querySelectorAll(".mic").forEach((b) => (b.onclick = (e) => { e.preventDefault(); listen($(b.dataset.for)); }));
-
-  if (!$("langBox")) {
-    const box = E("div", "box"); box.id = "langBox";
-    const sel = E("select");
-    [["en", "English (ब्रैकेट में हिंदी)"], ["hi", "हिंदी (ब्रैकेट में English)"]].forEach(([v, t]) => {
-      const o = E("option", "", t); o.value = v; if (S.lang === v) o.selected = true; sel.append(o);
-    });
-    sel.onchange = () => { S.lang = sel.value; S.dual = true; saveS(); render(); };
-    box.append(E("h3", "", "🌐 भाषा", "margin:0 0 8px"), sel);
-    $("pSet").prepend(box);
-  }
-
-  const st = document.createElement("style");
-  st.textContent = "#printArea{display:none}@media print{body>*{display:none!important}#printArea{display:block!important;padding:10px;color:#000;background:#fff}#printArea table{width:100%;border-collapse:collapse}#printArea td,#printArea th{border:1px solid #999;padding:6px}}";
-  document.head.append(st);
-  const pa = E("div"); pa.id = "printArea"; document.body.append(pa);
-  $("pdfBtn").onclick = () => {
-    const q = $("q").value.trim().toLowerCase();
-    let a = ITEMS.filter(mine);
-    if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
-    a = window.catFilter(a);
-    if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "")).toLowerCase().includes(q));
-    a.sort((p, r) => nm(p).localeCompare(nm(r)));
-    if (!a.length) return alert("लिस्ट ख़ाली है");
-    pa.innerHTML = "";
-    pa.append(E("h2", "", S.shop + " – रेट लिस्ट"), E("div", "", new Date().toLocaleDateString("hi-IN")));
-    const t = E("table"), h = E("tr");
-    ["#", "सामान", "भाव"].forEach((s) => h.append(E("th", "", s)));
-    t.append(h);
-    a.forEach((x, i) => {
-      const r = E("tr");
-      r.append(E("td", "", String(i + 1)), E("td", "", nm(x) + (x.alt ? " (" + x.alt + ")" : "") + (x.size ? " – " + x.size : "")), E("td", "", money(Number(x.sellPrice) || 0) + "/" + unitOf(x)));
-      t.append(r);
-    });
-    pa.append(t);
-    window.print();
-  };
-
-  render();
-})();
