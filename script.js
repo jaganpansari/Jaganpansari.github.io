@@ -1093,3 +1093,98 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     pen.disabled = false;
   };
 })();
+/* ===== भाषा: हिंदी / English ===== */
+(function () {
+  const D = {
+    "लोड हो रहा है...": "Loading...", "सिर्फ़ अपना मोबाइल नंबर": "Your mobile number", "OTP भेजें": "Send OTP",
+    "OTP डालें": "Enter OTP", "लॉगिन करें": "Login", "ऑनलाइन": "Online", "ऑफ़लाइन": "Offline",
+    "सामान या होलसेलर खोजें": "Search item or wholesaler", "A से Z": "A to Z", "नया पहले": "Newest first",
+    "पुराना पहले": "Oldest first", "वापस": "Back", "नया सामान जोड़ें": "Add new item", "होलसेलर का नाम": "Wholesaler name",
+    "मात्रा / साइज़ (जैसे 1 किलो पैकेट, 6 पीस)": "Quantity / size (e.g. 1 kg packet, 6 pieces)",
+    "ख़रीद भाव": "Buy price", "बेच भाव": "Sell price", "सेव करें": "Save", "लिस्ट": "List", "सेटिंग": "Settings",
+    "PIN डालें": "Enter PIN", "खोलें": "Unlock", "सब होलसेलर": "All wholesalers", "कोई सामान नहीं मिला": "No items found",
+    "सबसे सस्ता": "Cheapest", "मुनाफ़ा / घाटा % दिखाएँ": "Show profit / loss %", "मुनाफ़ा": "Profit", "घाटा": "Loss",
+    "नई दुकान का नाम": "New shop name", "नई दुकान": "New shop", "मेरी दुकान": "My shop", "सामान बदलें": "Edit item",
+    "WhatsApp पर भेजें": "Send on WhatsApp", "बारकोड जोड़ें": "Add barcode", "बारकोड जुड़ गया": "Barcode added",
+    "कैटेगरी हटाएँ": "Delete category", "PIN बदलें / हटाएँ": "Change / remove PIN", "बदलें": "Edit", "हटाएँ": "Delete",
+    "दिखावट": "Display", "नाम के साथ ब्रैकेट में दूसरी भाषा": "Other language name in brackets", "डार्क मोड": "Dark mode",
+    "मोटे अक्षर": "Bold text", "अक्षरों का आकार": "Text size", "रंग चुनें": "Choose colour", "मुद्रा": "Currency",
+    "चालू": "On", "बंद करें": "Close", "बंद": "Off", "PIN लॉक": "PIN lock", "PIN लगाएँ": "Set PIN",
+    "नया 4 अंक का PIN डालें (हटाना हो तो ख़ाली छोड़ें)": "New 4-digit PIN (leave empty to remove)",
+    "PIN लग गया": "PIN set", "PIN हटा दिया": "PIN removed", "PIN गलत है": "Wrong PIN", "Excel से सामान": "Import from Excel",
+    "कॉलम क्रम: सामान, होलसेलर, साइज़, यूनिट, ख़रीद, बेच": "Columns: Item, Wholesaler, Size, Unit, Buy, Sell",
+    "नमूना फ़ाइल": "Sample file", "नए सामान जुड़े (डबल वाले छोड़ दिए)": "new items added (duplicates skipped)",
+    "फ़ाइल नहीं पढ़ी गई": "Could not read file", "भाव का इतिहास": "Price history", "इतिहास देखें": "View history",
+    "किस सामान का भाव कब बदला": "When each item's price changed",
+    "अभी कोई बदलाव नहीं मिला। किसी सामान का भाव बदलेंगे, तो यहाँ दिखेगा।": "No changes yet. Change an item's price and it will show here.",
+    "अभी कोई बदलाव नहीं": "No changes yet", "हटाए गए सामान का इतिहास साफ़ करें": "Clear history of deleted items",
+    "पुरानी एंट्री हटाईं": "old entries removed", "सुझाव दें": "Feedback",
+    "ऐप में कोई कमी लगे या नया फ़ीचर चाहिए, तो लिखिए": "Tell us what to improve or which feature you need",
+    "पहले कुछ लिखिए": "Write something first", "भेजें": "Send", "लॉगआउट करें?": "Logout?", "लॉगआउट": "Logout",
+    "नई कैटेगरी का नाम (जैसे तेल)": "New category name (e.g. Oil)", "कैटेगरी": "Category",
+    "बदलने के लिए देर तक दबाएँ": "Long-press to edit", "सामान का नाम लिखिए": "Type item name", "कुछ नहीं मिला": "Nothing found",
+    "ऊपर नाम लिखिए, सामान भाव के साथ दिखेगा, दबाकर जोड़िए": "Type a name above, tap an item to add it",
+    "हो गया": "Done", "सही नंबर डालें": "Enter a valid number", "OTP भेज दिया": "OTP sent", "OTP गलत है": "Wrong OTP",
+    "सामान का नाम डालें": "Enter item name", "सामान का नाम": "Item name", "रेट लिस्ट": "Rate List", "लिस्ट ख़ाली है": "List is empty",
+    "इस फ़ोन में आवाज़ से लिखना नहीं चलता": "Voice typing does not work on this phone", "माइक": "Mic",
+    "यह बारकोड किसी सामान से नहीं जुड़ा": "No item has this barcode", "इस फ़ोन में स्कैनर नहीं चलता": "Scanner does not work on this phone",
+    "बारकोड स्कैन करें": "Scan barcode", "कैमरा नहीं खुला": "Camera error", "दुकान का नया नाम लिखिए": "Type the new shop name",
+    "इस नाम की दुकान पहले से है": "A shop with this name already exists", "दुकान का नाम बदल गया": "Shop name changed",
+    "नाम नहीं बदला": "Name not changed", "सामान खोजें": "Search item", "भाषा": "Language",
+    "ख़रीद": "Buy", "बेच": "Sell", "भाव": "Rate", "जोड़ें": "Add", "यूनिट": "Unit", "सामान": "Item", "होलसेलर": "Wholesaler",
+    "किलो": "Kg", "ग्राम": "Gram", "लीटर": "Litre", "पीस": "Piece", "पैकेट": "Packet", "दर्जन": "Dozen", "डिब्बा": "Box", "बोरी": "Bag"
+  };
+  const KEYS = Object.keys(D).sort((a, b) => b.length - a.length);
+  const tr = (s) => { if (!s || !/[\u0900-\u097F]/.test(s)) return s; for (const k of KEYS) if (s.includes(k)) s = s.split(k).join(D[k]); return s; };
+
+  const pick = (box, before) => {
+    const r = E("div", "row", null, "margin:8px 0 12px");
+    [["hi", "हिंदी"], ["en", "English"]].forEach(([v, t]) => {
+      const b = E("button", "pill" + ((S.lang || "hi") === v ? " on" : ""), t, "flex:1");
+      b.dataset.keep = "1";
+      b.onclick = () => { if ((S.lang || "hi") !== v) { S.lang = v; saveS(); location.reload(); } };
+      r.append(b);
+    });
+    before ? box.insertBefore(r, before) : box.append(r);
+  };
+  const lb = E("div", "box");
+  const lh = E("h3", "", "🌐 भाषा / Language", "margin:0 0 8px");
+  lh.dataset.keep = "1";
+  lb.append(lh);
+  pick(lb);
+  $("pSet").prepend(lb);
+  const lg = $("login").querySelector(".box");
+  if (lg) pick(lg, lg.querySelector(".row"));
+
+  if (S.lang !== "en") return;
+  const exactOnly = (el) => el && !el.closest(".cheap") && el.closest(".nm, .tag, [data-keep]");
+  const fix = (n) => {
+    if (n.nodeType === 3) {
+      const p = n.parentElement;
+      if (p && p.closest("#shopSel")) { if (D[n.data.trim()]) n.data = D[n.data.trim()]; return; }
+      if (exactOnly(p)) return;
+      const v = tr(n.data);
+      if (v !== n.data) n.data = v;
+      return;
+    }
+    if (n.nodeType !== 1) return;
+    if (n.tagName === "OPTION" && !n.hasAttribute("value")) n.value = n.textContent;
+    if (n.placeholder) n.placeholder = tr(n.placeholder);
+    n.querySelectorAll("option:not([value])").forEach((o) => (o.value = o.textContent));
+    n.querySelectorAll("[placeholder]").forEach((x) => (x.placeholder = tr(x.placeholder)));
+    const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT);
+    const list = [];
+    while (w.nextNode()) list.push(w.currentNode);
+    list.forEach(fix);
+  };
+  fix(document.body);
+  new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach(fix))).observe(document.body, { childList: true, subtree: true });
+  const a = window.alert, c = window.confirm, p = window.prompt, o = window.open;
+  window.alert = (m) => a(tr(String(m)));
+  window.confirm = (m) => c(tr(String(m)));
+  window.prompt = (m, d) => p(tr(String(m)), d);
+  window.open = (u, ...r) => {
+    if (String(u).includes("wa.me/?text=")) { const [h, t] = String(u).split("text="); u = h + "text=" + encodeURIComponent(tr(decodeURIComponent(t))); }
+    return o(u, ...r);
+  };
+})();
