@@ -1260,3 +1260,51 @@ $("pSet").querySelectorAll("button").forEach((b) => {
   sync();
   document.addEventListener("click", () => setTimeout(sync, 50));
 })();
+/* ===== पहले से सेव सामान की चेतावनी ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const k = (s) => String(s || "").trim().toLowerCase();
+  const find = () => {
+    const n = k($("fName").value), v = k($("fVen").value), z = k($("fSize").value);
+    if (!n) return null;
+    return ITEMS.filter(mine).find((x) => k(nm(x)) === n && k(x.vendor) === v && k(x.size) === z) || null;
+  };
+  const hint = E("div", "", null, "display:none;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff3e0;color:#8a4b00;font-weight:600");
+  $("saveItem").before(hint);
+  const show = () => {
+    const m = editId ? null : find();
+    if (!m) { hint.style.display = "none"; return; }
+    hint.textContent = "⚠️ " + T("ये सामान पहले से सेव है", "Already saved") + ": " + nm(m) + (m.vendor ? " (" + m.vendor + ")" : "") + " • " +
+      T("ख़रीद", "Buy") + " " + money(Number(m.buyPrice) || 0) + " • " + T("बेच", "Sell") + " " + money(Number(m.sellPrice) || 0);
+    hint.style.display = "block";
+  };
+  ["fName", "fVen", "fSize"].forEach((id) => { $(id).addEventListener("input", show); $(id).addEventListener("change", show); });
+  document.querySelectorAll(".mic[data-for]").forEach((b) => b.addEventListener("click", () => setTimeout(show, 4000)));
+  document.querySelector('nav button[data-p="pAdd"]').addEventListener("click", () => setTimeout(show, 50));
+
+  const orig = $("saveItem").onclick;
+  $("saveItem").onclick = () => {
+    const m = editId ? null : find();
+    if (!m) { hint.style.display = "none"; return orig(); }
+    const box = $("modalBox");
+    box.innerHTML = "";
+    const b1 = E("button", "btn", "✏️ " + T("पुराने का भाव बदलें", "Update the saved one"));
+    const b2 = E("button", "btn btn2", "➕ " + T("फिर भी नया जोड़ें", "Add as new anyway"));
+    const b3 = E("button", "btn btn2", "✖ " + T("रहने दें", "Cancel"));
+    box.append(
+      E("h3", "", "⚠️ " + T("ये सामान पहले से सेव है", "This item is already saved"), "margin:0 0 8px"),
+      E("div", "nm", nm(m) + (m.size ? " (" + m.size + ")" : "")),
+      E("div", "mut", (m.vendor || "—") + " • " + T("ख़रीद", "Buy") + " " + money(Number(m.buyPrice) || 0) + " • " + T("बेच", "Sell") + " " + money(Number(m.sellPrice) || 0) + "/" + unitOf(m)),
+      b1, b2, b3
+    );
+    $("modal").classList.add("on");
+    b1.onclick = () => {
+      $("modal").classList.remove("on");
+      if ($("fUnit").value === UNITS[0] && m.unit) $("fUnit").value = m.unit;
+      if (!$("fBuy").value) $("fBuy").value = m.buyPrice || "";
+      if (!$("fSell").value) $("fSell").value = m.sellPrice || "";
+      editId = m.id; editOld = { b: Number(m.buyPrice) || 0, s: Number(m.sellPrice) || 0 }; hint.style.display = "none"; orig(); };
+    b2.onclick = () => { $("modal").classList.remove("on"); hint.style.display = "none"; orig(); };
+    b3.onclick = () => $("modal").classList.remove("on");
+  };
+})();
