@@ -1217,3 +1217,46 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank");
   };
 })();
+/* ===== दुकान हटाना + पूरा रंग बदलना ===== */
+(function () {
+  const DEF = "मेरी दुकान";
+  const sel = $("shopSel");
+  const del = E("button", "ibtn", "🗑️", "width:40px;height:40px;background:#fff3;color:#fff;margin-left:6px");
+  const pen = sel.parentElement.querySelector("button.ibtn");
+  (pen || sel).after(del);
+  del.onclick = async () => {
+    const name = S.shop;
+    const others = [...sel.options].map((o) => o.value).filter((v) => v && v !== "__new" && v !== name);
+    if (!others.length) return alert("कम से कम एक दुकान रहनी चाहिए, इसे नहीं हटा सकते");
+    const same = (x) => (x.shop || DEF) === name;
+    const n = ITEMS.filter(same).length;
+    if (!confirm('"' + name + '" दुकान हटाएँ?')) return;
+    if (n && !confirm("⚠️ इस दुकान में " + n + " सामान हैं। ये सब भी हमेशा के लिए मिट जाएँगे। पक्का हटाएँ?")) return;
+    del.disabled = true;
+    try {
+      for (const c of ["items", "cats", "history"]) {
+        const s = await getDocs(collection(db, c));
+        for (const d of s.docs) if (same(d.data())) await deleteDoc(d.ref);
+      }
+      const sh = await getDocs(collection(db, "shops"));
+      for (const d of sh.docs) if (d.data().name === name) await deleteDoc(d.ref);
+      if (name === DEF) S.defGone = true;
+      S.shop = others[0];
+      saveS();
+      alert("✔️ दुकान हटा दी");
+      location.reload();
+    } catch (e) {
+      alert("दुकान नहीं हटी: " + e.message);
+    }
+    del.disabled = false;
+  };
+
+  const st = document.createElement("style");
+  st.textContent = ".cheap{background:linear-gradient(90deg,var(--acc),var(--acc2))!important}.cheap{animation:none!important}";
+  document.head.append(st);
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) { meta = document.createElement("meta"); meta.name = "theme-color"; document.head.append(meta); }
+  const sync = () => { meta.content = (THEMES[S.theme] || THEMES.orange)[0]; };
+  sync();
+  document.addEventListener("click", () => setTimeout(sync, 50));
+})();
