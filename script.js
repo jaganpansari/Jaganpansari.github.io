@@ -1308,3 +1308,192 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     b3.onclick = () => $("modal").classList.remove("on");
   };
 })();
+/* ===== फ़ोटो से भरें (AI) ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const KEY = () => localStorage.getItem("rlKey") || "";
+  const k = (s) => String(s || "").trim().toLowerCase();
+  const API = "https://generativelanguage.googleapis.com/v1beta/";
+
+  const sb = E("div", "box");
+  sb.append(E("h3", "", "🤖 " + T("AI चाबी (फ़ोटो से भरने के लिए)", "AI key (for fill from photo)"), "margin:0 0 8px"));
+  const st = E("div", "mut");
+  const ki = E("input");
+  ki.type = "password";
+  ki.placeholder = T("यहाँ चाबी पेस्ट करें (AIza...)", "Paste key here (AIza...)");
+  const kb = E("button", "btn", "💾 " + T("चाबी सेव करें", "Save key"));
+  const paint = () => (st.textContent = KEY() ? "✔️ " + T("चाबी लगी है (...", "Key saved (...") + KEY().slice(-4) + ")" : T("अभी कोई चाबी नहीं लगी", "No key yet"));
+  kb.onclick = () => { localStorage.setItem("rlKey", ki.value.trim()); ki.value = ""; paint(); alert(KEY() ? "✔️ " + T("चाबी सेव हो गई", "Key saved") : T("चाबी हटा दी", "Key removed")); };
+  paint();
+  sb.append(st, ki, kb);
+  $("pSet").append(sb);
+
+  const fb = E("button", "btn", "📷 " + T("फ़ोटो से भरें", "Fill from photo"), "margin:10px 0 0");
+  $("backAdd").after(fb);
+  const fi = E("input");
+  fi.type = "file";
+  fi.accept = "image/*";
+  fi.style.display = "none";
+  document.body.append(fi);
+
+  const small = (file) => new Promise((ok, bad) => {
+    const img = new Image();
+    img.onload = () => {
+      const m = 1600, r = Math.min(1, m / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      ok(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = bad;
+    img.src = URL.createObjectURL(file);
+  });
+
+  let MODEL = "";
+  const pickModel = async () => {
+    if (MODEL) return MODEL;
+    try {
+      const r = await fetch(API + "models?pageSize=200", { headers: { "x-goog-api-key": KEY() } });
+      const j = await r.json();
+      const ok = (j.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /flash/i.test(m.name) && !/(image|tts|audio|live|embed|lite|preview|exp)/i.test(m.name));
+      if (!ok.length) ok.push(...(j.models || []).filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /flash/i.test(m.name) && !/(image|tts|audio|live|embed)/i.test(m.name)));
+      ok.sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true }));
+      MODEL = ok.length ? ok[0].name : "models/gemini-2.5-flash";
+    } catch (e) { MODEL = "models/gemini-2.5-flash"; }
+    return MODEL;
+  };
+
+  const read = async (dataUrl) => {
+    const names = [...new Set(ITEMS.filter(mine).map(nm))].slice(0, 300).join(", ");
+    const vens = [...new Set(ITEMS.filter(mine).map((x) => x.vendor).filter(Boolean))].join(", ");
+    const prompt = "This photo is a handwritten or printed price list from an Indian grocery (pansari) shop, in Hindi and/or English. " +
+      "Read every item line. For each line return: name (item name exactly as written), vendor (wholesaler name if written, else empty), size (pack/quantity like '1 किलो', '500g', else empty), " +
+      "unit (one of: " + UNITS.join(", ") + "; pick the closest, default किलो), buy (purchase price number or null), sell (selling price number or null), unsure (true if any part of this line was hard to read). " +
+      "If a line has only one price, put it in buy. Never invent items. Prefer these existing item names when the written name clearly means the same thing: " + names + ". Existing wholesalers: " + vens + ". " +
+      "Return only a JSON array.";
+    const model = await pickModel();
+    const r = await fetch(API + model + ":generateContent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": KEY() },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: dataUrl.split(",")[1] } }] }],
+        generationConfig: { responseMimeType: "application/json", temperature: 0 }
+      })
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error.message);
+    const txt = (((j.candidates || [])[0] || {}).content || {}).parts?.map((p) => p.text || "").join("") || "[]";
+    const arr = JSON.parse(txt.replace(/^[^\[]*/, "").replace(/[^\]]*$/, ""));
+    return Array.isArray(arr) ? arr : [];
+  };
+
+  const findOld = (n, v, z) => ITEMS.filter(mine).find((x) => k(nm(x)) === k(n) && k(x.vendor) === k(v) && k(x.size) === k(z));
+
+  const review = (dataUrl, rows) => {
+    const box = $("modalBox");
+    box.innerHTML = "";
+    const pic = E("img", "", null, "width:100%;max-height:220px;object-fit:contain;border-radius:12px;background:#0001");
+    pic.src = dataUrl;
+    pic.onclick = () => (pic.style.maxHeight = pic.style.maxHeight ? "" : "220px");
+    const dv = E("input");
+    dv.placeholder = T("सबका होलसेलर (जिनमें ख़ाली है)", "Wholesaler for all blank rows");
+    dv.setAttribute("list", "venList");
+    const list = E("div");
+    const save = E("button", "btn", "");
+    const cancel = E("button", "btn btn2", "✖ " + T("रहने दें", "Cancel"));
+    box.append(E("h3", "", "📷 " + T("जाँचें और ठीक करें", "Check and correct"), "margin:0 0 6px"),
+      E("div", "mut", T("फ़ोटो दबाकर बड़ी करें। पीले वाले ध्यान से देखें।", "Tap photo to enlarge. Check yellow rows carefully.")), pic, dv, list, save, cancel);
+    const R = [];
+    const count = () => (save.textContent = "✔️ " + T("सब सेव करें", "Save all") + " (" + R.filter((r) => !r.gone && r.n.value.trim()).length + ")");
+    rows.forEach((x) => {
+      const c = E("div", "card", null, "display:block;padding:10px;margin:8px 0" + (x.unsure ? ";background:#fff8d6;outline:2px solid #ffb300" : ""));
+      const inp = (v, ph, w, type) => { const i = E("input", "", null, "padding:8px;margin:3px 0;width:" + w); i.value = v == null ? "" : v; i.placeholder = ph; if (type) { i.type = type; i.inputMode = "decimal"; } return i; };
+      const n = inp(x.name, T("सामान", "Item"), "100%");
+      const v = inp(x.vendor, T("होलसेलर", "Wholesaler"), "49%"); v.setAttribute("list", "venList");
+      const z = inp(x.size, T("साइज़", "Size"), "49%");
+      const u = E("select", "", null, "padding:8px;margin:3px 0;width:32%");
+      UNITS.forEach((o) => { const op = E("option", "", o); op.value = o; u.append(op); });
+      u.value = UNITS.includes(x.unit) ? x.unit : UNITS[0];
+      const b = inp(x.buy, T("ख़रीद", "Buy"), "32%", "number");
+      const s = inp(x.sell, T("बेच", "Sell"), "32%", "number");
+      const note = E("div", "mut", "", "margin-top:4px");
+      const del = E("button", "pill", "✖ " + T("हटाएँ", "Remove"), "margin-top:4px");
+      const r = { n, v, z, u, b, s, gone: false };
+      const chk = () => {
+        const o = findOld(n.value, v.value || dv.value, z.value);
+        r.old = o;
+        if (!o) { note.textContent = n.value.trim() ? "🆕 " + T("नया सामान", "New item") : ""; note.style.color = ""; return; }
+        const ob = Number(o.buyPrice) || 0, nb = Number(b.value) || 0;
+        const big = ob && nb && (nb > ob * 3 || nb < ob / 3);
+        note.textContent = (big ? "⚠️ " + T("भाव बहुत अलग है! ", "Price very different! ") : "♻️ ") + T("पहले से है, भाव बदलेगा", "Already saved, price will update") + " (" + T("पुराना", "old") + " " + money(ob) + ")";
+        note.style.color = big ? "#d32f2f" : "";
+      };
+      [n, v, z, b].forEach((i) => i.addEventListener("input", () => { chk(); count(); }));
+      dv.addEventListener("input", chk);
+      del.onclick = () => { r.gone = true; c.remove(); count(); };
+      const row = (...a) => { const d = E("div", "", null, "display:flex;gap:2%;flex-wrap:wrap"); d.append(...a); return d; };
+      const lab = row(E("span", "mut", T("यूनिट", "Unit"), "width:32%"), E("span", "mut", T("ख़रीद", "Buy"), "width:32%"), E("span", "mut", T("बेच", "Sell"), "width:32%"));
+      c.append(n, row(v, z), lab, row(u, b, s), note, del);
+      list.append(c);
+      R.push(r);
+      chk();
+    });
+    if (!rows.length) list.append(E("div", "box", T("फ़ोटो में कोई सामान नहीं पढ़ा गया। साफ़ फ़ोटो फिर से खींचें।", "No items could be read. Take a clearer photo."), "text-align:center"));
+    count();
+    cancel.onclick = () => $("modal").classList.remove("on");
+    save.onclick = async () => {
+      const todo = R.filter((r) => !r.gone && r.n.value.trim());
+      if (!todo.length) return;
+      if (!confirm(todo.length + " " + T("सामान सेव करें?", "items will be saved. Continue?"))) return;
+      save.disabled = true;
+      let a = 0, u = 0;
+      for (const r of todo) {
+        const name = r.n.value.trim(), vendor = (r.v.value.trim() || dv.value.trim()), size = r.z.value.trim();
+        const old = findOld(name, vendor, size);
+        const nb = r.b.value === "" ? (old ? Number(old.buyPrice) || 0 : 0) : Number(r.b.value) || 0;
+        const ns = r.s.value === "" ? (old ? Number(old.sellPrice) || 0 : 0) : Number(r.s.value) || 0;
+        const d = { Item: name, vendor, size, unit: r.u.value, buyPrice: nb, sellPrice: ns, shop: S.shop };
+        try {
+          if (old) {
+            await updateDoc(doc(db, "items", old.id), d);
+            const ob = Number(old.buyPrice) || 0, os = Number(old.sellPrice) || 0;
+            if (ob !== nb || os !== ns) await addDoc(collection(db, "history"), { Item: name, vendor, unit: d.unit, size, shop: S.shop, oldBuy: ob, newBuy: nb, oldSell: os, newSell: ns, t: Date.now() });
+            u++;
+          } else {
+            d.t = Date.now();
+            try { d.alt = /[\u0900-\u097F]/.test(name) ? toEng(name) : await toHindi(name); } catch (e) {}
+            await addDoc(collection(db, "items"), d);
+            a++;
+          }
+        } catch (e) { alert("Error: " + e.message); }
+      }
+      $("modal").classList.remove("on");
+      alert("✔️ " + a + " " + T("नए जुड़े", "added") + ", " + u + " " + T("के भाव बदले", "updated"));
+      go("pList");
+    };
+    $("modal").classList.add("on");
+  };
+
+  fb.onclick = () => {
+    if (!KEY()) return alert(T("पहले सेटिंग में AI चाबी डालें", "First add the AI key in Settings"));
+    fi.value = "";
+    fi.click();
+  };
+  fi.onchange = async () => {
+    const f = fi.files[0];
+    if (!f) return;
+    const box = $("modalBox");
+    box.innerHTML = "";
+    box.append(E("div", "", null, "text-align:center;padding:20px"));
+    box.firstChild.append(E("div", "tarazu", "⚖️"), E("div", "", T("फ़ोटो पढ़ी जा रही है... (10-30 सेकंड)", "Reading photo... (10-30 seconds)")));
+    $("modal").classList.add("on");
+    try {
+      const url = await small(f);
+      const rows = await read(url);
+      review(url, rows);
+    } catch (e) {
+      $("modal").classList.remove("on");
+      alert(T("फ़ोटो नहीं पढ़ी गई: ", "Could not read photo: ") + e.message);
+    }
+  };
+})();
