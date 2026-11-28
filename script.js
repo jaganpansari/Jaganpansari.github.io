@@ -1497,3 +1497,50 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     }
   };
 })();
+/* ===== AI मॉडल सुधार + सीधा कैमरा ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const clean = (s) => String(s || "").replace(/[^\x21-\x7E]/g, "");
+  if (localStorage.getItem("rlKey")) localStorage.setItem("rlKey", clean(localStorage.getItem("rlKey")));
+
+  const of = window.fetch.bind(window);
+  const swap = (u, m) => u.replace(/models\/[^:\/?]+:generateContent/, m + ":generateContent");
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes("generativelanguage.googleapis.com")) return of(url, opt);
+    opt = Object.assign({}, opt || {});
+    const h = Object.assign({}, opt.headers || {});
+    if (h["x-goog-api-key"]) h["x-goog-api-key"] = clean(h["x-goog-api-key"]);
+    opt.headers = h;
+    const gen = url.includes(":generateContent");
+    const saved = localStorage.getItem("rlModel");
+    if (gen && saved) url = swap(url, saved);
+    let r = await of(url, opt);
+    if (gen && !r.ok) {
+      const j = await r.clone().json().catch(() => null);
+      const msg = (j && j.error && j.error.message) || "";
+      const m = /use\s+(models\/[\w.\-]+)/i.exec(msg);
+      const next = m ? m[1].replace(/[.\-]+$/, "") : (!saved && /not found|no longer|not supported/i.test(msg) ? "models/gemini-3.8-flash" : "");
+      if (next && !url.includes(next + ":")) {
+        localStorage.setItem("rlModel", next);
+        r = await of(swap(url, next), opt);
+      }
+    }
+    return r;
+  };
+
+  const fb = [...document.querySelectorAll("#pAdd button")].find((b) => /फ़ोटो से भरें|Fill from photo/.test(b.textContent));
+  const fi = document.querySelector('body > input[type="file"][accept="image/*"]');
+  if (fb && fi) {
+    fb.textContent = "🖼️ " + T("गैलरी से भरें", "Fill from gallery");
+    fb.classList.add("btn2");
+    const cam = E("button", "btn", "📷 " + T("कैमरे से भरें", "Fill from camera"), "margin:10px 0 0");
+    fb.before(cam);
+    cam.onclick = () => {
+      if (!localStorage.getItem("rlKey")) return alert(T("पहले सेटिंग में AI चाबी डालें", "First add the AI key in Settings"));
+      fi.value = "";
+      fi.setAttribute("capture", "environment");
+      fi.click();
+      setTimeout(() => fi.removeAttribute("capture"), 1500);
+    };
+  }
+})();
