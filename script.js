@@ -2002,4 +2002,215 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     if (fi.files.length > 1) { e.stopImmediatePropagation(); runQueue([...fi.files]); }
   }, true);
 })();
+/* ===== बिलों की लाइन (queue), भीड़ में इंतज़ार, गैलरी फ़ोटो, सामान की फ़ोटो, खोज ✖ ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const fi = document.querySelector('body > input[type="file"][accept="image/*"]');
+  const pill = [...document.querySelectorAll("body > button")].find((b) => b.style.position === "fixed");
+  const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const until = async (fn, ms) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > (ms || 300000)) return false; await sleep(300); } return true; };
+  const modalOn = () => $("modal").classList.contains("on");
+
+  const load = async (file) => {
+    let src;
+    try { src = await createImageBitmap(file); } catch (e) {
+      src = await new Promise((ok, bad) => {
+        const fr = new FileReader();
+        fr.onload = () => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => bad(new Error("x")); im.src = fr.result; };
+        fr.onerror = () => bad(new Error("x"));
+        fr.readAsDataURL(file);
+      });
+    }
+    return src;
+  };
+  const toJpeg = async (file, max, q) => {
+    const src = await load(file);
+    const r = Math.min(1, max / Math.max(src.width, src.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(src.width * r); c.height = Math.round(src.height * r);
+    c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+    const data = c.toDataURL("image/jpeg", q);
+    const blob = await new Promise((ok) => c.toBlob(ok, "image/jpeg", q));
+    return { data, file: new File([blob], "bill.jpg", { type: "image/jpeg" }) };
+  };
+
+  if (fi && pill) {
+    const Q = [];
+    let shown = null, session = false, busyMsg = "";
+    const prev = window.fetch;
+    window.fetch = async (url, opt) => {
+      if (window.__show17 && typeof url === "string" && url.includes(":generateContent")) {
+        const t = window.__show17; window.__show17 = null;
+        return new Response(t, { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return prev(url, opt);
+    };
+    const prompt = () => {
+      const names = [...new Set(ITEMS.filter(mine).map(nm))].slice(0, 300).join(", ");
+      const vens = [...new Set(ITEMS.filter(mine).map((x) => x.vendor).filter(Boolean))].join(", ");
+      return "This photo is a handwritten or printed price list from an Indian grocery (pansari) shop, in Hindi and/or English. " +
+        "Read every item line. For each line return: name (item name exactly as written), vendor (wholesaler name if written, else empty), size (pack/quantity like '1 किलो', '500g', else empty), " +
+        "unit (one of: " + UNITS.join(", ") + "; pick the closest, default किलो), buy (purchase price number or null), sell (selling price number or null), unsure (true if any part of this line was hard to read). " +
+        "If a line has only one price, put it in buy. Never invent items. Prefer these existing item names when the written name clearly means the same thing: " + names + ". Existing wholesalers: " + vens + ". " +
+        "Return only a JSON array.";
+    };
+    const paint = () => {
+      if (shown || window.__rereading) return;
+      const ready = Q.filter((x) => x.st === "ready").length, wait = Q.filter((x) => x.st === "wait" || x.st === "read").length;
+      if (!ready && !wait) { pill.style.display = "none"; session = false; return; }
+      pill.style.display = "block";
+      if (ready) {
+        pill.style.background = "#2e7d32";
+        pill.textContent = "✅ " + ready + T(" बिल तैयार — देखें", " bill(s) ready — Open") + (wait ? " • ⏳ " + wait : "");
+      } else {
+        pill.style.background = "#555";
+        pill.textContent = "⏳ " + (busyMsg || T("बिल पढ़ा जा रहा है", "Reading bill")) + " (" + wait + ")" + T("... आप काम जारी रखें", "... keep working");
+      }
+    };
+    let reading = false;
+    const reader = async () => {
+      if (reading) return;
+      reading = true;
+      for (;;) {
+        const it = Q.find((x) => x.st === "wait");
+        if (!it) break;
+        it.st = "read"; busyMsg = ""; paint();
+        let tries = 0;
+        for (;;) {
+          const t0 = Date.now();
+          let r, msg = "";
+          try {
+            const url = "https://generativelanguage.googleapis.com/v1beta/" + (localStorage.getItem("rlModel") || "models/gemini-3.8-flash") + ":generateContent";
+            r = await window.fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": localStorage.getItem("rlKey") || "" },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt() }, { inline_data: { mime_type: "image/jpeg", data: it.data.split(",")[1] } }] }], generationConfig: { responseMimeType: "application/json", temperature: 0 } }) });
+            if (!r.ok) { const j = await r.clone().json().catch(() => null); msg = (j && j.error && j.error.message) || ("HTTP " + r.status); }
+          } catch (e) { msg = e.message || "network"; }
+          if (r && r.ok) { it.text = await r.text(); it.sec = Math.round((Date.now() - t0) / 1000); it.st = "ready"; break; }
+          const busy = (r && (r.status === 503 || r.status === 500)) || /busy|भीड़|high demand|overloaded|unavailable|network|Failed to fetch/i.test(msg);
+          if (busy && tries < 15) {
+            tries++;
+            for (let s = 60; s > 0; s -= 5) { busyMsg = T("Google पर भीड़ है, ", "Google busy, retry in ") + s + T(" सेकंड में फिर कोशिश", "s"); paint(); await sleep(window.__busyWait || 5000); }
+            busyMsg = ""; continue;
+          }
+          it.st = "fail"; busyMsg = "";
+          alert(T("फ़ोटो नहीं पढ़ी गई: ", "Could not read photo: ") + msg);
+          break;
+        }
+        paint();
+        if (session && !shown && !modalOn()) next();
+      }
+      reading = false;
+      paint();
+    };
+    const next = async () => {
+      const it = Q.find((x) => x.st === "ready");
+      if (!it || shown) { paint(); return; }
+      shown = it; session = true;
+      const dt = new DataTransfer(); dt.items.add(it.file); fi.files = dt.files;
+      window.__show17 = it.text; window.__readSec = it.sec; window.__q = null;
+      pill.textContent = "";
+      fi.onchange();
+      await sleep(300);
+      await until(() => pill.textContent.includes("✅") || pill.style.display === "none", 30000);
+      if (!pill.textContent.includes("✅")) { it.st = "fail"; shown = null; paint(); return; }
+      const total = Q.length, pos = Q.indexOf(it) + 1;
+      const h = $("modalBox").querySelector("h3");
+      if (h && !$("modalBox").querySelector(".rlq")) h.before(E("div", "rlq", "🧾 " + T("बिल ", "Bill ") + pos + " / " + total, "font-weight:700;color:var(--acc)"));
+      $("modal").classList.add("on");
+      pill.style.display = "none";
+      await sleep(500);
+      await until(() => !modalOn() && !window.__rereading, 3600000);
+      it.st = "done"; shown = null;
+      await sleep(700);
+      if (Q.some((x) => x.st === "ready")) next(); else paint();
+    };
+    pill.onclick = () => { if (!shown) next(); };
+    const add = async (files) => {
+      for (const f of files) {
+        try { const j = await toJpeg(f, 1600, 0.85); Q.push({ file: j.file, data: j.data, st: "wait" }); }
+        catch (e) { alert(T("ये फ़ोटो नहीं खुली। कैमरे से नई फ़ोटो खींचें, या फ़ोटो का स्क्रीनशॉट लेकर वो डालें।", "This photo could not be opened. Take a new photo with the camera, or use a screenshot of it.")); }
+      }
+      paint();
+      reader();
+    };
+    window.addEventListener("change", (e) => {
+      if (e.target !== fi || !fi.files.length) return;
+      e.stopImmediatePropagation(); e.stopPropagation();
+      add([...fi.files]);
+    }, true);
+  }
+
+  /* ---- सामान की फ़ोटो (मर्ज़ी से) ---- */
+  let pimg = null;
+  const pv = E("img", "", null, "display:none;width:90px;height:90px;object-fit:cover;border-radius:12px;margin-right:8px");
+  const pb = E("button", "btn btn2", "📷 " + T("सामान की फ़ोटो (मर्ज़ी से)", "Item photo (optional)"), "margin:0;flex:1");
+  const px = E("button", "pill", "✖", "display:none");
+  const pin = E("input"); pin.type = "file"; pin.accept = "image/*"; pin.style.display = "none";
+  const prow = E("div", "row", null, "margin-top:12px");
+  prow.append(pv, pb, px, pin);
+  $("saveItem").before(prow);
+  const setP = (d) => { pimg = d; pv.src = d || ""; pv.style.display = px.style.display = d ? "" : "none"; };
+  pb.onclick = () => { pin.value = ""; pin.click(); };
+  px.onclick = () => setP("");
+  pin.onchange = async () => {
+    if (!pin.files[0]) return;
+    try { setP((await toJpeg(pin.files[0], 320, 0.7)).data); }
+    catch (e) { alert(T("ये फ़ोटो नहीं खुली", "Could not open this photo")); }
+  };
+  new MutationObserver(() => {
+    if (typeof editId !== "undefined" && editId) { const x = ITEMS.find((i) => i.id === editId); setP(x && x.img ? x.img : null); }
+    else setP(null);
+  }).observe($("addTitle"), { childList: true, characterData: true, subtree: true });
+  const k = (s) => String(s || "").trim().toLowerCase();
+  $("saveItem").addEventListener("click", () => {
+    if (pimg === null) return;
+    const want = pimg, n = k($("fName").value), v = k($("fVen").value), z = k($("fSize").value), eid = (typeof editId !== "undefined" && editId) || null;
+    if (!n) return;
+    (async () => {
+      for (let i = 0; i < 40; i++) {
+        await sleep(500);
+        const x = eid ? ITEMS.find((it) => it.id === eid) : ITEMS.filter(mine).find((it) => k(nm(it)) === n && k(it.vendor) === v && k(it.size) === z);
+        if (x) { if ((x.img || "") !== want) await updateDoc(doc(db, "items", x.id), { img: want }).catch(() => {}); return; }
+      }
+    })();
+  }, true);
+
+  const visible = () => {
+    let a = ITEMS.filter(mine);
+    if (curVen) a = a.filter((x) => (x.vendor || "—") === curVen);
+    if (window.catFilter) a = window.catFilter(a);
+    const q = $("q").value.trim().toLowerCase();
+    if (q) a = a.filter((x) => (nm(x) + " " + (x.alt || "") + " " + (x.vendor || "") + " " + (x.size || "")).toLowerCase().includes(q));
+    const srt = { az: (p, r) => nm(p).localeCompare(nm(r)), new: (p, r) => (r.t || 0) - (p.t || 0), old: (p, r) => (p.t || 0) - (r.t || 0) };
+    return a.sort(srt[S.sort] || srt.az);
+  };
+  const oldR = render;
+  render = function () {
+    oldR();
+    const cards = [...$("list").querySelectorAll(".card")], a = visible();
+    if (cards.length !== a.length) return;
+    cards.forEach((c, i) => {
+      if (!a[i].img) return;
+      const im = E("img", "", null, "width:56px;height:56px;object-fit:cover;border-radius:10px;flex:none;align-self:center");
+      im.src = a[i].img;
+      c.prepend(im);
+    });
+  };
+  const oldS = window.openSheet;
+  window.openSheet = (x) => {
+    oldS(x);
+    if (x.img) { const im = E("img", "", null, "width:100%;max-height:260px;object-fit:contain;border-radius:12px;margin-bottom:8px"); im.src = x.img; $("sheetBox").prepend(im); }
+  };
+  render();
+
+  /* ---- खोज में ✖ ---- */
+  const q = $("q");
+  const cx = E("button", "", "✖", "display:none;flex:none;margin-left:-52px;width:40px;height:40px;border:0;border-radius:50%;background:#8883;color:var(--tx);font-size:16px;z-index:1");
+  q.after(cx);
+  q.style.paddingRight = "48px";
+  const sx = () => (cx.style.display = q.value ? "block" : "none");
+  q.addEventListener("input", sx);
+  setInterval(sx, 800);
+  cx.onclick = (e) => { e.preventDefault(); q.value = ""; q.blur(); sx(); render(); };
+})();
 
