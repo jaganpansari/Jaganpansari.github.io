@@ -1730,3 +1730,60 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     return prev(url, opt);
   };
 })();
+/* ===== भीड़ होने पर अपने-आप दोबारा कोशिश ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const prev = window.fetch;
+  const busy = async (r) => {
+    if (r.ok) return false;
+    if (r.status === 503 || r.status === 500) return true;
+    const j = await r.clone().json().catch(() => null);
+    return /high demand|overloaded|unavailable|try again later/i.test((j && j.error && j.error.message) || "");
+  };
+  const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes(":generateContent")) return prev(url, opt);
+    let r = await prev(url, opt);
+    for (let i = 0; i < 2 && (await busy(r)); i++) { await wait(4000 * (i + 1)); r = await prev(url, opt); }
+    if (await busy(r)) {
+      const saved = localStorage.getItem("rlModel") || "";
+      const alt = /lite/.test(saved) ? saved.replace(/-lite$/, "") : (saved || "models/gemini-3.8-flash") + "-lite";
+      localStorage.setItem("rlModel", alt);
+      const r2 = await prev(url, opt);
+      if (r2.ok) return r2;
+      if (saved) localStorage.setItem("rlModel", saved);
+      if (await busy(r2)) return new Response(JSON.stringify({ error: { message: T("Google पर अभी बहुत भीड़ है। 5-10 मिनट बाद फिर कोशिश करें।", "Google is very busy right now. Try again in 5-10 minutes.") } }), { status: 503, headers: { "Content-Type": "application/json" } });
+      return r2;
+    }
+    return r;
+  };
+})();
+
+/* ===== बिल पीछे-पीछे पढ़ना ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const pill = E("button", "", "", "display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:95px;z-index:60;border:0;border-radius:24px;padding:12px 20px;font-size:1em;font-weight:700;color:#fff;box-shadow:0 4px 14px #0005");
+  document.body.append(pill);
+  let wait = false, ready = false;
+  const show = (txt, bg) => { pill.textContent = txt; pill.style.background = bg; pill.style.display = "block"; };
+  const hide = () => { pill.style.display = "none"; wait = false; ready = false; };
+  pill.onclick = () => { if (ready) { $("modal").classList.add("on"); hide(); } };
+  new MutationObserver(() => {
+    const box = $("modalBox");
+    if (box.querySelector(".tarazu") && /फ़ोटो पढ़ी जा रही|Reading photo/.test(box.textContent)) {
+      wait = true; ready = false;
+      setTimeout(() => { if (wait && !ready) $("modal").classList.remove("on"); }, 50);
+      show("⏳ " + T("बिल पढ़ा जा रहा है... आप काम जारी रखें", "Reading bill... keep working"), "#555");
+      return;
+    }
+    if (wait && /जाँचें और ठीक करें|Check and correct/.test(box.textContent)) {
+      ready = true; wait = false;
+      setTimeout(() => $("modal").classList.remove("on"), 0);
+      const n = box.querySelectorAll(".card").length;
+      show("✅ " + T("बिल तैयार है", "Bill ready") + " (" + n + ") — " + T("देखें", "Open"), "#2e7d32");
+      try { navigator.vibrate && navigator.vibrate([150, 80, 150]); } catch (e) {}
+    }
+  }).observe($("modalBox"), { childList: true, subtree: true });
+  const a = window.alert;
+  window.alert = (m) => { if (/फ़ोटो नहीं पढ़ी|Could not read photo/.test(String(m))) hide(); return a(m); };
+})();
