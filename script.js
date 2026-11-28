@@ -1787,3 +1787,105 @@ $("pSet").querySelectorAll("button").forEach((b) => {
   const a = window.alert;
   window.alert = (m) => { if (/फ़ोटो नहीं पढ़ी|Could not read photo/.test(String(m))) hide(); return a(m); };
 })();
+/* ===== तेज़ पढ़ना: छपा बिल / हाथ का पर्चा ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const mode = () => localStorage.getItem("rlMode") || "print";
+  const cam = [...document.querySelectorAll("#pAdd button")].find((b) => /कैमरे से भरें|Fill from camera/.test(b.textContent));
+  if (cam) {
+    const row = E("div", "row", null, "margin-top:10px");
+    const mk = (v, t) => {
+      const b = E("button", "pill", t, "flex:1;padding:10px");
+      b.onclick = () => { localStorage.setItem("rlMode", v); paint(); };
+      row.append(b);
+      return b;
+    };
+    const p1 = mk("print", "🖨️ " + T("छपा बिल (तेज़)", "Printed bill (fast)"));
+    const p2 = mk("hand", "✍️ " + T("हाथ का पर्चा", "Handwritten"));
+    const paint = () => { p1.classList.toggle("on", mode() === "print"); p2.classList.toggle("on", mode() === "hand"); };
+    paint();
+    cam.before(row);
+  }
+
+  const crop = (b64, parts) => new Promise((ok) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = img.width, h = img.height;
+      if (parts < 2 || h < w * 1.2) return ok([b64]);
+      const step = h / parts, lap = Math.round(step * 0.1), out = [];
+      for (let i = 0; i < parts; i++) {
+        const y0 = Math.max(0, Math.round(i * step) - lap), y1 = Math.min(h, Math.round((i + 1) * step) + lap);
+        const c = document.createElement("canvas");
+        c.width = w; c.height = y1 - y0;
+        c.getContext("2d").drawImage(img, 0, y0, w, y1 - y0, 0, 0, w, y1 - y0);
+        out.push(c.toDataURL("image/jpeg", 0.85).split(",")[1]);
+      }
+      ok(out);
+    };
+    img.onerror = () => ok([b64]);
+    img.src = "data:image/jpeg;base64," + b64;
+  });
+  const rowsOf = async (r) => {
+    const j = await r.json();
+    const t = j.candidates[0].content.parts.map((p) => p.text || "").join("");
+    const a = JSON.parse(t.replace(/^[^\[]*/, "").replace(/[^\]]*$/, ""));
+    return Array.isArray(a) ? a : [];
+  };
+  const pack = (rows) => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(rows) }] } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+  const prev = window.fetch;
+  const call = async (url, opt, body, fast) => {
+    const b = JSON.parse(JSON.stringify(body));
+    if (fast && !localStorage.getItem("rlNoLvl")) b.generationConfig = Object.assign({}, b.generationConfig, { thinkingConfig: { thinkingLevel: "low" } });
+    let r = await prev(url, Object.assign({}, opt, { body: JSON.stringify(b) }));
+    if (!r.ok && r.status === 400 && fast) {
+      const j = await r.clone().json().catch(() => null);
+      if (/thinking/i.test((j && j.error && j.error.message) || "")) {
+        localStorage.setItem("rlNoLvl", "1");
+        delete b.generationConfig.thinkingConfig;
+        r = await prev(url, Object.assign({}, opt, { body: JSON.stringify(b) }));
+      }
+    }
+    return r;
+  };
+
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes(":generateContent") || !opt || typeof opt.body !== "string") return prev(url, opt);
+    let body;
+    try { body = JSON.parse(opt.body); } catch (e) { return prev(url, opt); }
+    const t0 = Date.now();
+    const done = (r) => { window.__readSec = Math.round((Date.now() - t0) / 1000); return r; };
+    if (mode() === "print") {
+      body.contents[0].parts[0].text += " This is a clearly PRINTED computer bill: read it directly, quickly, without long reasoning.";
+      return done(await call(url, opt, body, true));
+    }
+    const pic = body.contents[0].parts.find((p) => p.inline_data);
+    const strips = pic ? await crop(pic.inline_data.data, 2) : [];
+    if (strips.length < 2) return done(await call(url, opt, body, false));
+    try {
+      const res = await Promise.all(strips.map((s, i) => {
+        const b = JSON.parse(JSON.stringify(body));
+        b.contents[0].parts[0].text += " NOTE: this image is part " + (i + 1) + " of " + strips.length + " of one handwritten list (cut from top to bottom, edges overlap). Read only lines that are fully visible in this part.";
+        b.contents[0].parts.find((p) => p.inline_data).inline_data.data = s;
+        return call(url, opt, b, false);
+      }));
+      if (res.some((r) => !r.ok)) throw new Error("part failed");
+      const all = [], seen = new Set();
+      for (const r of res) for (const x of await rowsOf(r)) {
+        const k = String(x.name || "").trim().toLowerCase() + "|" + (x.buy == null ? "" : x.buy) + "|" + String(x.size || "").trim().toLowerCase();
+        if (!seen.has(k)) { seen.add(k); all.push(x); }
+      }
+      return done(pack(all));
+    } catch (e) {
+      return done(await call(url, opt, body, false));
+    }
+  };
+
+  new MutationObserver(() => {
+    const box = $("modalBox");
+    if (!window.__readSec || box.querySelector(".rlsec") || !/जाँचें और ठीक करें|Check and correct/.test(box.textContent)) return;
+    const h = box.querySelector("h3");
+    if (h) h.after(E("div", "mut rlsec", "⏱️ " + T("पढ़ने में ", "Read in ") + window.__readSec + T(" सेकंड लगे", " seconds")));
+    window.__readSec = 0;
+  }).observe($("modalBox"), { childList: true, subtree: true });
+})();
