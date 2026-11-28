@@ -2213,4 +2213,171 @@ $("pSet").querySelectorAll("button").forEach((b) => {
   setInterval(sx, 800);
   cx.onclick = (e) => { e.preventDefault(); q.value = ""; q.blur(); sx(); render(); };
 })();
+/* ===== फ़ोन के अंदर पढ़ना (बिना Google) + Google को कम बार पूछना ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const pill = [...document.querySelectorAll("body > button")].find((b) => b.style.position === "fixed");
+  const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const say = (t, bg) => { if (!pill) return; pill.style.display = "block"; pill.style.background = bg || "#555"; pill.textContent = t; };
+  const mode = () => localStorage.getItem("rlMode") || "print";
+
+  /* ---- तीसरा बटन: फ़ोन से पढ़ो ---- */
+  const p1 = [...document.querySelectorAll("#pAdd button")].find((b) => /छपा बिल|Printed bill/.test(b.textContent));
+  if (p1) {
+    const row = p1.parentNode;
+    const r2 = E("div", "row", null, "margin-top:8px");
+    const p3 = E("button", "pill", "📱 " + T("फ़ोन से पढ़ो (बिना Google)", "Read on phone (no Google)"), "flex:1;padding:10px");
+    r2.append(p3);
+    row.after(r2);
+    const paint3 = () => {
+      p3.classList.toggle("on", mode() === "phone");
+      if (mode() === "phone") row.querySelectorAll("button").forEach((b) => b.classList.remove("on"));
+    };
+    p3.onclick = () => { localStorage.setItem("rlMode", "phone"); paint3(); };
+    row.addEventListener("click", () => setTimeout(paint3, 0));
+    paint3();
+  }
+
+  /* ---- Tesseract लाना (पहली बार नेट चाहिए) ---- */
+  let worker = null, pct = "";
+  const getWorker = async () => {
+    if (worker) return worker;
+    if (!window.Tesseract) {
+      await new Promise((ok, bad) => {
+        const s = document.createElement("script");
+        s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+        s.onload = ok; s.onerror = () => bad(new Error(T("पढ़ने वाला सिस्टम डाउनलोड नहीं हुआ। पहली बार नेट चालू रखें।", "Could not download the reader. Keep internet on the first time.")));
+        document.head.append(s);
+      });
+    }
+    say("⬇️ " + T("पढ़ने वाली भाषा-फ़ाइल आ रही है (सिर्फ़ पहली बार)...", "Downloading language file (first time only)..."));
+    const w = await Tesseract.createWorker("eng+hin", 1, {
+      logger: (m) => { if (m && m.status === "recognizing text") { pct = Math.round((m.progress || 0) * 100) + "%"; say("📱 " + T("फ़ोन बिल पढ़ रहा है ", "Phone reading bill ") + pct); } }
+    });
+    await w.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
+    worker = w;
+    return worker;
+  };
+
+  /* ---- फ़ोटो साफ़ करना: काला-सफ़ेद, तेज़ ---- */
+  const prep = (b64) => new Promise((ok) => {
+    const im = new Image();
+    im.onload = () => {
+      const r = Math.min(2, 2000 / Math.max(im.width, im.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(im.width * r); c.height = Math.round(im.height * r);
+      const g = c.getContext("2d");
+      g.drawImage(im, 0, 0, c.width, c.height);
+      const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+      for (let i = 0; i < p.length; i += 4) {
+        let v = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+        v = Math.max(0, Math.min(255, (v - 128) * 1.6 + 140));
+        p[i] = p[i + 1] = p[i + 2] = v;
+      }
+      g.putImageData(d, 0, 0);
+      ok(c.toDataURL("image/png"));
+    };
+    im.onerror = () => ok("data:image/jpeg;base64," + b64);
+    im.src = "data:image/jpeg;base64," + b64;
+  });
+
+  /* ---- लाइन से नाम, साइज़, भाव निकालना ---- */
+  const DEV = "०१२३४५६७८९";
+  const digits = (s) => s.replace(/[०-९]/g, (d) => DEV.indexOf(d));
+  const SZ = /(\d+(?:\.\d+)?)\s*(kgs?|kg|gms?|gm|grams?|g|ltrs?|ltr|lt|l|ml|किलो|ग्राम|लीटर|मिली)(?![a-z\u0900-\u097f])/i;
+  const SKIP = /(total|sub ?total|grand|g\.?s\.?t|cgst|sgst|igst|tax|invoice|bill no|date|phone|mob|gstin|amount|round|discount|balance|thank|कुल|योग|दिनांक|मोबाइल|बिल)/i;
+  const lev = (a, b) => {
+    const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= n; j++) d[0][j] = j;
+    for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[m][n];
+  };
+  const key = (s) => String(s || "").toLowerCase().replace(/[^a-z\u0900-\u097f]/g, "");
+  const known = (name) => {
+    const k = key(name);
+    if (k.length < 3) return null;
+    let best = null, bd = 99;
+    for (const x of ITEMS.filter(mine)) for (const c of [nm(x), x.alt, x.name]) {
+      const kc = key(c);
+      if (!kc) continue;
+      const dd = lev(k, kc) / Math.max(k.length, kc.length);
+      if (dd < bd) { bd = dd; best = x; }
+    }
+    return bd <= 0.25 ? best : null;
+  };
+  const near = (a, b) => Math.abs(a - b) <= Math.max(1, b * 0.02);
+  const parse = (text) => {
+    const out = [];
+    for (let line of text.split("\n")) {
+      line = digits(line).replace(/[|_=~“”"'।॥]/g, " ").replace(/(\d),(\d{3})/g, "$1$2").replace(/(\d)\s*[,]\s*(\d{2})\b/g, "$1.$2").replace(/\s+/g, " ").trim();
+      if (line.length < 4 || SKIP.test(line)) continue;
+      let size = "";
+      const sm = SZ.exec(line);
+      if (sm) { size = sm[1] + " " + sm[2]; line = line.replace(sm[0], " "); }
+      const nums = [], name = [];
+      line.split(" ").filter(Boolean).forEach((w) => {
+        const n = w.replace(/^[^\d]+|[^\d.]+$/g, "");
+        const isWord = /[a-z\u0900-\u097f]/i.test(w);
+        if (!isWord && /^\d+(\.\d+)?$/.test(n)) { if (name.length) nums.push(parseFloat(n)); }
+        else if (isWord && !nums.length) name.push(w);
+      });
+      if (!name.length || !nums.length) continue;
+      const nameTxt = name.join(" ").trim();
+      if (key(nameTxt).length < 2) continue;
+      let buy = null, sell = null, unsure = true;
+      const L = nums.length;
+      if (L >= 3 && near(nums[L - 3] * nums[L - 2], nums[L - 1])) { buy = nums[L - 2]; unsure = false; }
+      else if (L >= 2) {
+        const b = nums[L - 2], c = nums[L - 1];
+        if (near(b, c)) { buy = c; unsure = false; }
+        else if (c > b && c <= b * 1.6) { buy = b; sell = c; }
+        else buy = c;
+      } else buy = nums[0];
+      const o = known(nameTxt);
+      out.push({ name: o ? nm(o) : nameTxt, vendor: o ? (o.vendor || "") : "", size: o && !size ? (o.size || "") : size, unit: o ? (o.unit || "किलो") : "किलो", buy, sell, unsure });
+    }
+    return out;
+  };
+  window.__rlParse = parse;
+
+  /* ---- Google को कम बार पूछना: बीच में रुकना ---- */
+  let lastAt = 0, gap = 0;
+  const prev = window.fetch;
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes(":generateContent") || window.__show17) return prev(url, opt);
+    if (mode() === "phone") {
+      const t0 = Date.now();
+      try {
+        const body = JSON.parse(opt.body);
+        const pic = body.contents[0].parts.find((p) => p.inline_data);
+        const w = await getWorker();
+        say("📱 " + T("फ़ोन बिल पढ़ रहा है...", "Phone reading bill..."));
+        const res = await w.recognize(await prep(pic.inline_data.data));
+        const rows = parse((res && res.data && res.data.text) || "");
+        window.__readSec = Math.round((Date.now() - t0) / 1000);
+        if (!rows.length) throw new Error(T("बिल में कोई लाइन समझ नहीं आई। फ़ोटो सीधी और पास से, रोशनी में खींचें।", "No lines understood. Take the photo straight, close and in good light."));
+        return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(rows) }] } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: { message: e.message || "OCR" } }), { status: 400, headers: { "Content-Type": "application/json" } });
+      }
+    }
+    for (;;) {
+      const left = lastAt + gap - Date.now();
+      if (left <= 0) break;
+      say("⏳ " + T("Google की सीमा: ", "Google limit: ") + Math.ceil(left / 1000) + T(" सेकंड रुककर पूछेंगे", "s wait"));
+      await sleep(Math.min(left, window.__gapTick || 1000));
+    }
+    if (gap > 15000) window.__forceFull = 1;
+    lastAt = Date.now();
+    let r = await prev(url, opt);
+    if (r.ok) { gap = 15000; return r; }
+    const j = await r.clone().json().catch(() => null);
+    const msg = (j && j.error && j.error.message) || "";
+    if (r.status === 429 || r.status === 503 || r.status === 500 || /quota|rate|exhausted|सीमा|भीड़|busy|high demand/i.test(msg)) {
+      gap = 75000;
+      r = new Response(JSON.stringify({ error: { message: T("Google पर भीड़ / सीमा भरी", "Google busy / limit reached") } }), { status: 503, headers: { "Content-Type": "application/json" } });
+    }
+    return r;
+  };
+})();
 
