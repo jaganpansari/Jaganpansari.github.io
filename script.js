@@ -2380,4 +2380,82 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     return r;
   };
 })();
+/* ===== फ़ोन वाला बटन हटाना + आज की Google गिनती ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const LIMIT = 20;
+
+  /* ---- फ़ोन वाला बटन हटाना ---- */
+  const ph = [...document.querySelectorAll("#pAdd button")].find((b) => /फ़ोन से पढ़ो|Read on phone/.test(b.textContent));
+  if (ph) (ph.parentNode.classList.contains("row") ? ph.parentNode : ph).remove();
+  if (localStorage.getItem("rlMode") === "phone") {
+    localStorage.setItem("rlMode", "print");
+    const p1 = [...document.querySelectorAll("#pAdd button")].find((b) => /छपा बिल|Printed bill/.test(b.textContent));
+    if (p1) p1.click();
+  }
+
+  /* ---- गिनती: Google का दिन (अमेरिका का समय) ---- */
+  const day = () => { try { return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date()); } catch (e) { return new Date(Date.now() - 8 * 3600000).toISOString().slice(0, 10); } };
+  const get = () => { let c = {}; try { c = JSON.parse(localStorage.getItem("rlCount") || "{}"); } catch (e) {} if (c.d !== day()) c = { d: day(), f: 0, l: 0 }; return c; };
+  const bump = (lite) => { const c = get(); c[lite ? "l" : "f"]++; localStorage.setItem("rlCount", JSON.stringify(c)); paint(); };
+  try { performance.setResourceTimingBufferSize(1000); } catch (e) {}
+  try {
+    new PerformanceObserver((list) => {
+      list.getEntries().forEach((en) => {
+        const m = /models\/([^:\/?]+):generateContent/.exec(en.name || "");
+        if (m && /generativelanguage/.test(en.name)) bump(/lite/.test(m[1]));
+      });
+    }).observe({ type: "resource", buffered: false });
+  } catch (e) {}
+
+  /* ---- जोड़ें पेज पर गिनती दिखाना ---- */
+  const box = E("div", "mut", "", "margin:8px 4px 0;font-weight:700;text-align:center");
+  const cam = [...document.querySelectorAll("#pAdd button")].find((b) => /कैमरे से भरें|Fill from camera/.test(b.textContent));
+  if (cam) cam.before(box);
+  const paint = () => {
+    const c = get(), left = Math.max(0, LIMIT - c.f);
+    box.style.color = left <= 3 ? "#c62828" : "";
+    box.textContent = "🔢 " + T("आज Google से पढ़ाई: ", "Google reads today: ") + c.f + " / " + LIMIT +
+      T(" (बचे " + left + ")", " (" + left + " left)") + (c.l ? " • lite " + c.l : "") +
+      T(" — दोपहर 1:30 बजे फिर 0", " — resets 1:30 PM");
+  };
+  paint();
+  setInterval(paint, 30000);
+
+  /* ---- हाथ का पर्चा: दो टुकड़ों की जगह एक ही बार भेजना ---- */
+  const widen = (b64) => new Promise((ok) => {
+    const im = new Image();
+    im.onload = () => {
+      if (im.height < im.width * 1.2) return ok(b64);
+      const c = document.createElement("canvas");
+      c.width = Math.ceil(im.height / 1.15); c.height = im.height;
+      const g = c.getContext("2d");
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      g.drawImage(im, 0, 0);
+      ok(c.toDataURL("image/jpeg", 0.9).split(",")[1]);
+    };
+    im.onerror = () => ok(b64);
+    im.src = "data:image/jpeg;base64," + b64;
+  });
+
+  /* ---- सीमा पूरी हो तो बार-बार न पूछना ---- */
+  let fails = 0;
+  const stop = () => new Response(JSON.stringify({ error: { message: T("आज की Google सीमा (" + LIMIT + " बार) पूरी हो गई। दोपहर 1:30 बजे के बाद फिर चलेगा।", "Today's Google limit (" + LIMIT + ") is used up. It works again after 1:30 PM.") } }), { status: 400, headers: { "Content-Type": "application/json" } });
+  const prev = window.fetch;
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes(":generateContent") || window.__show17) return prev(url, opt);
+    if (get().f >= LIMIT || fails >= 4) { if (get().f < LIMIT) fails = 0; return stop(); }
+    if ((localStorage.getItem("rlMode") || "print") === "hand" && opt && typeof opt.body === "string") {
+      try {
+        const b = JSON.parse(opt.body);
+        const pic = b.contents[0].parts.find((p) => p.inline_data);
+        if (pic) { pic.inline_data.data = await widen(pic.inline_data.data); opt = Object.assign({}, opt, { body: JSON.stringify(b) }); }
+      } catch (e) {}
+    }
+    const r = await prev(url, opt);
+    if (r.ok) { fails = 0; return r; }
+    if (r.status === 503 || r.status === 429) { fails++; if (fails >= 4) return stop(); }
+    return r;
+  };
+})();
 
