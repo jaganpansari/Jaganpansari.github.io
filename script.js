@@ -1652,3 +1652,61 @@ $("pSet").querySelectorAll("button").forEach((b) => {
   ["fName", "fVen", "fSize"].forEach((id) => $(id).addEventListener("change", fix));
   $("saveItem").addEventListener("click", fix, true);
 })();
+/* ===== फ़ोटो: जल्दी, अंग्रेज़ी नाम, एक होलसेलर ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const shrink = (b64) => new Promise((ok) => {
+    const img = new Image();
+    img.onload = () => {
+      const m = 1024, r = Math.min(1, m / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      ok(c.toDataURL("image/jpeg", 0.7).split(",")[1]);
+    };
+    img.onerror = () => ok(b64);
+    img.src = "data:image/jpeg;base64," + b64;
+  });
+  const EXTRA = " IMPORTANT: Write every item name in English letters (Roman script), e.g. 'हल्दी' -> 'Haldi', 'माचा चाय' -> 'Macha chai'. If it matches an existing item name, use that exact existing name. " +
+    "The whole photo is one bill from ONE wholesaler: find the wholesaler/shop name written on the bill and put that same name in vendor for every line (use the existing wholesaler name if it matches; leave empty if not written). Keep it short and answer quickly.";
+  const prev = window.fetch;
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes(":generateContent") || !opt || !opt.body) return prev(url, opt);
+    let body;
+    try { body = JSON.parse(opt.body); } catch (e) { return prev(url, opt); }
+    const parts = body.contents[0].parts;
+    if (parts[0] && parts[0].text && !parts[0].text.includes("IMPORTANT: Write every item name")) parts[0].text += EXTRA;
+    const pic = parts.find((p) => p.inline_data);
+    if (pic) pic.inline_data.data = await shrink(pic.inline_data.data);
+    const plain = JSON.stringify(body);
+    if (localStorage.getItem("rlNoThink")) return prev(url, Object.assign({}, opt, { body: plain }));
+    body.generationConfig = Object.assign({}, body.generationConfig, { thinkingConfig: { thinkingLevel: "low" } });
+    let r = await prev(url, Object.assign({}, opt, { body: JSON.stringify(body) }));
+    if (!r.ok && r.status === 400) {
+      const j = await r.clone().json().catch(() => null);
+      if (/thinking/i.test((j && j.error && j.error.message) || "")) { localStorage.setItem("rlNoThink", "1"); r = await prev(url, Object.assign({}, opt, { body: plain })); }
+    }
+    return r;
+  };
+
+  const isDv = (i) => /सबका होलसेलर|Wholesaler for all/.test(i.placeholder || "");
+  const isRowVen = (i) => i.closest(".card") && /^(होलसेलर|Wholesaler)$/.test(i.placeholder || "");
+  new MutationObserver(() => {
+    const box = $("modalBox");
+    const dv = [...box.querySelectorAll("input")].find(isDv);
+    if (!dv || dv.dataset.done) return;
+    dv.dataset.done = "1";
+    dv.placeholder = T("होलसेलर चुनें या नया नाम लिखें", "Pick wholesaler or type a new one");
+    dv.style.cssText += ";border:2px solid var(--acc);font-weight:700";
+    dv.before(E("label", "", "🧾 " + T("ये बिल किस होलसेलर का है?", "Whose bill is this?")));
+    const rows = () => [...box.querySelectorAll("input")].filter(isRowVen);
+    const cnt = {};
+    rows().forEach((i) => { const v = i.value.trim(); if (v) cnt[v] = (cnt[v] || 0) + 1; });
+    const top = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || "";
+    const apply = () => rows().forEach((i) => { if (i.value !== dv.value.trim()) { i.value = dv.value.trim(); i.dispatchEvent(new Event("input")); } });
+    dv.value = top;
+    apply();
+    dv.addEventListener("input", apply);
+    dv.addEventListener("change", apply);
+  }).observe($("modalBox"), { childList: true });
+})();
