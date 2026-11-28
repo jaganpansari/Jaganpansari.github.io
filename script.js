@@ -1544,3 +1544,53 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     };
   }
 })();
+
+/* ===== फ़्री कोटा वाला मॉडल चुनना ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const prev = window.fetch;
+  const BAD = /(omni|pro|ultra|image|tts|audio|live|embed|exp|preview)/i;
+  let list = null;
+  const getList = async (opt) => {
+    if (list) return list;
+    list = [];
+    try {
+      const r = await prev("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: opt.headers });
+      const j = await r.json();
+      list = (j.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent") && /gemini-[\d.]+-flash(-lite)?$/i.test(m.name) && !BAD.test(m.name))
+        .map((m) => m.name)
+        .sort((a, b) => (/lite/.test(a) - /lite/.test(b)) || b.localeCompare(a, undefined, { numeric: true }));
+    } catch (e) {}
+    return list;
+  };
+  const why = async (r) => { const j = await r.clone().json().catch(() => null); return (j && j.error && j.error.message) || ""; };
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes(":generateContent")) return prev(url, opt);
+    opt = opt || {};
+    const saved = localStorage.getItem("rlModel");
+    const tries = [];
+    if (saved && !BAD.test(saved)) tries.push(saved);
+    tries.push("models/gemini-3.8-flash");
+    (await getList(opt)).forEach((m) => tries.push(m));
+    tries.push("models/gemini-3.8-flash-lite");
+    let last = null, lastMsg = "";
+    for (const m of [...new Set(tries)]) {
+      localStorage.setItem("rlModel", m);
+      const r = await prev(url, opt);
+      if (r.ok) return r;
+      const msg = await why(r);
+      last = r; lastMsg = msg;
+      const skip = /limit:\s*0\b/.test(msg) || /not found|no longer|not supported|unknown model/i.test(msg) || r.status === 404;
+      if (!skip) break;
+    }
+    if (saved) localStorage.setItem("rlModel", saved); else localStorage.removeItem("rlModel");
+    if (/quota|rate|exhausted/i.test(lastMsg) && !/limit:\s*0\b/.test(lastMsg)) {
+      return new Response(JSON.stringify({ error: { message: T("आज की फ़्री सीमा पूरी हो गई। थोड़ी देर बाद या कल फिर कोशिश करें।", "Today's free limit is used up. Try again later or tomorrow.") } }), { status: 429, headers: { "Content-Type": "application/json" } });
+    }
+    if (/limit:\s*0\b/.test(lastMsg)) {
+      return new Response(JSON.stringify({ error: { message: T("इस चाबी पर कोई फ़्री मॉडल नहीं मिला। स्क्रीनशॉट भेजें।", "No free model found for this key. Send a screenshot.") } }), { status: 429, headers: { "Content-Type": "application/json" } });
+    }
+    return last;
+  };
+})();
