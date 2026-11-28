@@ -1710,3 +1710,23 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     dv.addEventListener("change", apply);
   }).observe($("modalBox"), { childList: true });
 })();
+/* ===== सही भाव (एक पीस का) ===== */
+(function () {
+  localStorage.setItem("rlNoThink", "1");
+  const RULE = " PRICE RULES (very important): buy and sell must always be the price of ONE single piece/unit, never the total of a bundle or line. " +
+    "Bills often show a pack count like '3P', '6P', '12 pcs', '6 Set' and a total amount; in that case buy = total amount divided by that count, rounded to 2 decimals. " +
+    "If the bill has separate Rate and Amount columns, use Rate (per piece), not Amount. If MRP per piece is written, put it in sell. " +
+    "Put the pack count (like '6P') in size only if it is part of the product name; otherwise keep the real pack size like '100g'. Think carefully about the numbers before answering.";
+  const prev = window.fetch;
+  window.fetch = (url, opt) => {
+    if (typeof url === "string" && url.includes(":generateContent") && opt && typeof opt.body === "string") {
+      try {
+        const b = JSON.parse(opt.body);
+        const p = b.contents[0].parts[0];
+        if (p && p.text && !p.text.includes("PRICE RULES")) p.text += RULE;
+        opt = Object.assign({}, opt, { body: JSON.stringify(b) });
+      } catch (e) {}
+    }
+    return prev(url, opt);
+  };
+})();
