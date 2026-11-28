@@ -1594,3 +1594,61 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     return last;
   };
 })();
+/* ===== साइज़ और नाम की समझदार पहचान ===== */
+(function () {
+  const U = [
+    [/^(kilograms?|kilos?|kgs?|किलोग्राम|किलो|कि\.?ग्रा\.?|केजी)$/, "kg", 1000],
+    [/^(grams?|grms?|gms?|gm|g|ग्राम|ग्रा\.?|जी)$/, "g", 1],
+    [/^(litres?|liters?|ltrs?|lt|l|लीटर|ली\.?)$/, "l", 1000],
+    [/^(millilitres?|milliliters?|ml|मिली|एमएल)$/, "ml", 1],
+    [/^(pieces?|pcs?|पीस|नग)$/, "pc", 0],
+    [/^(packets?|pkts?|pack|पैकेट)$/, "pkt", 0],
+    [/^(dozens?|dz|दर्जन)$/, "dz", 0]
+  ];
+  const base = (s) => String(s || "").normalize("NFC").replace(/\u093C/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const size = (s) => {
+    let t = base(s).replace(/(\d)\s*([^\d\s.])/g, "$1 $2").replace(/([^\d\s.])(\d)/g, "$1 $2");
+    const p = t.split(" ");
+    for (let i = 0; i < p.length; i++) for (const [re, u, f] of U) if (re.test(p[i].replace(/\.$/, ""))) { p[i] = u; break; }
+    t = p.join(" ");
+    const m = /^([\d.]+) (kg|g|l|ml)$/.exec(t);
+    if (m) {
+      const v = parseFloat(m[1]) * ({ kg: 1000, g: 1, l: 1000, ml: 1 })[m[2]];
+      return (m[2] === "kg" || m[2] === "g" ? "w" : "v") + Math.round(v);
+    }
+    return t.replace(/\s+/g, "");
+  };
+  const nameOk = (a, x) => { const n = base(a); return n && (n === base(nm(x)) || (x.alt && n === base(x.alt))); };
+  const same = (n, v, z) => ITEMS.filter(mine).find((x) => nameOk(n, x) && base(v) === base(x.vendor) && size(z) === size(x.size));
+
+  const prev = window.fetch;
+  window.fetch = async (url, opt) => {
+    const r = await prev(url, opt);
+    if (typeof url !== "string" || !url.includes(":generateContent") || !r.ok) return r;
+    try {
+      const j = await r.clone().json();
+      const part = j.candidates[0].content.parts.find((p) => p.text);
+      const txt = part.text;
+      const rows = JSON.parse(txt.replace(/^[^\[]*/, "").replace(/[^\]]*$/, ""));
+      rows.forEach((row) => {
+        const o = same(row.name, row.vendor, row.size) || (!row.vendor && ITEMS.filter(mine).filter((x) => nameOk(row.name, x) && size(row.size) === size(x.size)).length === 1 ? ITEMS.filter(mine).find((x) => nameOk(row.name, x) && size(row.size) === size(x.size)) : null);
+        if (o) { row.name = nm(o); row.vendor = o.vendor || ""; row.size = o.size || ""; }
+      });
+      part.text = JSON.stringify(rows);
+      return new Response(JSON.stringify(j), { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch (e) { return r; }
+  };
+
+  const fix = () => {
+    if (typeof editId !== "undefined" && editId) return;
+    const o = same($("fName").value, $("fVen").value, $("fSize").value);
+    if (!o) return;
+    let ch = false;
+    if ($("fName").value !== nm(o)) { $("fName").value = nm(o); ch = true; }
+    if ($("fVen").value !== (o.vendor || "")) { $("fVen").value = o.vendor || ""; ch = true; }
+    if ($("fSize").value !== (o.size || "")) { $("fSize").value = o.size || ""; ch = true; }
+    if (ch) $("fSize").dispatchEvent(new Event("input"));
+  };
+  ["fName", "fVen", "fSize"].forEach((id) => $(id).addEventListener("change", fix));
+  $("saveItem").addEventListener("click", fix, true);
+})();
