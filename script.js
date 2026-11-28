@@ -1889,3 +1889,117 @@ $("pSet").querySelectorAll("button").forEach((b) => {
     window.__readSec = 0;
   }).observe($("modalBox"), { childList: true, subtree: true });
 })();
+/* ===== छपा बिल पहले lite से + दोबारा पढ़ो + कई फ़ोटो ===== */
+(function () {
+  const T = (h, e) => (S.lang === "en" ? e : h);
+  const fi = document.querySelector('body > input[type="file"][accept="image/*"]');
+  const pill = [...document.querySelectorAll("body > button")].find((b) => b.style.position === "fixed");
+  if (!fi || !pill) return;
+  fi.multiple = true;
+  const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const until = async (fn, ms) => { const t = Date.now(); while (!fn()) { if (Date.now() - t > (ms || 300000)) return false; await sleep(300); } return true; };
+  const lite = (m) => (m || "models/gemini-3.8-flash").replace(/-lite$/, "") + "-lite";
+  const bad = async (r) => {
+    try {
+      const j = await r.clone().json();
+      const t = j.candidates[0].content.parts.map((p) => p.text || "").join("");
+      const a = JSON.parse(t.replace(/^[^\[]*/, "").replace(/[^\]]*$/, ""));
+      if (!a.length) return true;
+      const nob = a.filter((x) => x.buy == null || x.buy === "" || isNaN(Number(x.buy))).length;
+      return nob > a.length * 0.3 || a.some((x) => String(x.name || "").trim().length < 2);
+    } catch (e) { return true; }
+  };
+  const cache = {};
+  window.__q = null;
+  const prev = window.fetch;
+  window.fetch = async (url, opt) => {
+    if (typeof url !== "string" || !url.includes(":generateContent")) return prev(url, opt);
+    const q = window.__q;
+    if (q && q.mode === "show" && cache[q.idx]) return new Response(cache[q.idx], { status: 200, headers: { "Content-Type": "application/json" } });
+    const full = window.__forceFull; window.__forceFull = 0;
+    let r;
+    if (!full && (localStorage.getItem("rlMode") || "print") === "print") {
+      const saved = localStorage.getItem("rlModel");
+      localStorage.setItem("rlModel", lite(saved));
+      try { r = await prev(url, opt); } finally { if (saved) localStorage.setItem("rlModel", saved); else localStorage.removeItem("rlModel"); }
+      if (!r.ok || (await bad(r))) r = await prev(url, opt);
+    } else r = await prev(url, opt);
+    if (q && r.ok) cache[q.idx] = await r.clone().text();
+    return r;
+  };
+
+  const setFile = (f) => { const dt = new DataTransfer(); dt.items.add(f); fi.files = dt.files; };
+  const readyNow = () => pill.textContent.includes("✅");
+  const failNow = () => pill.style.display === "none";
+  const openReview = () => { $("modal").classList.add("on"); pill.style.display = "none"; };
+
+  new MutationObserver(() => {
+    const box = $("modalBox");
+    if (box.querySelector(".rlre") || !/जाँचें और ठीक करें|Check and correct/.test(box.textContent)) return;
+    const h = box.querySelector("h3");
+    if (!h) return;
+    const re = E("button", "btn btn2 rlre", "🔍 " + T("ठीक से दोबारा पढ़ो", "Read again carefully"), "margin:6px 0");
+    re.onclick = async () => {
+      window.__rereading = 1;
+      $("modal").classList.remove("on");
+      window.__forceFull = 1;
+      if (window.__q) window.__q.mode = "reread";
+      pill.textContent = "";
+      fi.onchange();
+      await sleep(300);
+      await until(() => readyNow() || failNow());
+      if (readyNow()) openReview();
+      if (window.__q) window.__q.mode = "show";
+      window.__rereading = 0;
+    };
+    const tag = window.__q ? E("div", "", "🧾 " + T("बिल ", "Bill ") + (window.__q.idx + 1) + " / " + window.__q.n, "font-weight:700;color:var(--acc)") : null;
+    (box.querySelector(".rlsec") || h).after(re);
+    if (tag) h.before(tag);
+  }).observe($("modalBox"), { childList: true, subtree: true });
+
+  const runQueue = async (files) => {
+    const n = files.length, ok = [];
+    const oldClick = pill.onclick;
+    pill.onclick = () => {};
+    for (let i = 0; i < n; i++) {
+      window.__q = { mode: "read", idx: i, n };
+      setFile(files[i]);
+      pill.textContent = "";
+      fi.onchange();
+      await sleep(300);
+      pill.style.display = "block"; pill.style.background = "#555";
+      pill.textContent = "⏳ " + T("बिल ", "Bill ") + (i + 1) + "/" + n + T(" पढ़ा जा रहा है...", " being read...");
+      await until(() => readyNow() || failNow());
+      $("modal").classList.remove("on");
+      if (cache[i]) ok.push(i);
+    }
+    window.__q = null;
+    if (!ok.length) { pill.style.display = "none"; pill.onclick = oldClick; return; }
+    pill.style.display = "block"; pill.style.background = "#2e7d32";
+    pill.textContent = "✅ " + ok.length + "/" + n + T(" बिल तैयार — देखें", " bills ready — Open");
+    try { navigator.vibrate && navigator.vibrate([150, 80, 150]); } catch (e) {}
+    pill.onclick = async () => {
+      pill.onclick = () => {};
+      for (const i of ok) {
+        window.__q = { mode: "show", idx: i, n };
+        setFile(files[i]);
+        pill.textContent = "";
+        fi.onchange();
+        await sleep(300);
+        await until(() => readyNow() || failNow(), 30000);
+        if (!readyNow()) continue;
+        openReview();
+        await sleep(500);
+        await until(() => !$("modal").classList.contains("on") && !window.__rereading, 3600000);
+        await sleep(800);
+      }
+      window.__q = null;
+      pill.style.display = "none";
+      pill.onclick = oldClick;
+    };
+  };
+  fi.addEventListener("change", (e) => {
+    if (fi.files.length > 1) { e.stopImmediatePropagation(); runQueue([...fi.files]); }
+  }, true);
+})();
+
